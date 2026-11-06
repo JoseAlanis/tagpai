@@ -1,0 +1,20 @@
+# Study materials stay in the users' private study folders
+ratings_*.json
+batch_*.json
+!tests/fixtures/*.json
+sealed/
+*_key.json
+packages/
+data/
+.env
+
+# IDE
+.idea
+
+# Build output and test artefacts
+dist/
+shots*/
+*.tar.gz
+*.zip
+node_modules/
+__pycache__/
