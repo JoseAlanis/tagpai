@@ -488,8 +488,8 @@ const marked = (st, line, tag, version = "text") => st.marks.some(m => m.line ==
 // the conversation still until Continue; `pulse` panels reveal the next reply; the others wait for the mark
 // they ask for.
 
-// The process-based practice: a made-up first session with Bill (case adapted from Hofmann, 2025; the
-// page does not cite it). Symptoms first, then processes (both sides), the raw output, the strategies.
+// The process-based practice: a made-up first session with Bill (case adapted from Hofmann, 2025).
+// Symptoms first, then processes (both sides), the raw output, the strategies.
 const BILL = dialogue([
   "There's a presentation I have to give in my class next month. Just thinking about it, my heart starts racing. I'm socially awkward, and everyone will see it.",
   "That sounds really hard. What goes through your mind when you picture yourself standing up there?",
@@ -568,7 +568,7 @@ const TOUR = PRACTICE.tour;
 /* ---------------- State ---------------- */
 const STORE = `tagpai:${PACKAGE.package_id}:v1`;   // one store per package: copies for other raters never mix
 const $ = (s, root = document) => root.querySelector(s);
-const chars = s => Array.from(s);           // offsets are code points, as the importer checks them
+const chars = s => Array.from(s);           // offsets count code points, not UTF-16 units
 const motion = () => matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth";
 const saved = restore();
 let state = saved || { codebook: PACKAGE.codebook, current: 0, view: "welcome", theme: null,
@@ -1250,7 +1250,7 @@ function openNote(t) {
 function saveDraft() {
   const st = sess(), t = draft.tag;
   if (t.noteRequired && !draft.picks.length && !draft.note.trim()) return;
-  draft.note = draft.note.slice(0, TEXT_LIMIT);   // the field stops there already; a saved file must load again
+  draft.note = draft.note.slice(0, TEXT_LIMIT);   // the same limit as the field and as loading
   const picks = (t.picks || []).flatMap(g => g.items).filter(x => draft.picks.includes(x));   // codebook order, not click order
   if (draft.mark) { draft.mark.picks = picks; draft.mark.note = draft.note.trim(); }
   else st.marks.push({ id: uid(), line: target.line, version: target.version, start: target.start, end: target.end,
