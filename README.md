@@ -22,9 +22,10 @@ conversations. A guided practice on a made-up session gets you started.
 Early demo phase (v0.0.x): the code and a public demo with made-up
 content. Not yet for studies.
 
-## About
+## License
 
-| | |
-|---|---|
-| Meta | [![License: BSD-3-Clause](https://img.shields.io/badge/license-BSD--3--Clause-blue.svg)](LICENSE)
-|
+TagpAI is licensed under a BSD-3-Clause license (click below for details).
+
+[![License: 
+BSD-3-Clause](https://img.shields.io/badge/license-BSD--3--Clause-blue.svg)](LICENSE)
+
