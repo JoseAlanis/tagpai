@@ -1,0 +1,13 @@
+# Proposes updates to the actions pinned in .github/workflows: checked daily,
+# a release once it is seven days old, all updates in one pull request.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: daily
+    cooldown:
+      default-days: 7
+    groups:
+      actions:
+        patterns: ["*"]

@@ -34,7 +34,12 @@ export async function run(htmlPath, shotDir, body) {
   const downloads = mkdtempSync(join(tmpdir(), 'tagpai-dl-'));
   const profile = mkdtempSync(join(tmpdir(), 'tagpai-chrome-'));
   const chrome = spawn(process.env.CHROME || 'google-chrome', ['--headless=new', '--disable-gpu', '--no-first-run', '--no-default-browser-check',
-    `--user-data-dir=${profile}`, '--remote-debugging-port=0', '--window-size=1280,900', 'about:blank'], { stdio: 'ignore' });
+    `--user-data-dir=${profile}`, '--remote-debugging-port=0', '--window-size=1280,900', 'about:blank'], { stdio: ['ignore', 'ignore', 'pipe'] });
+  // Chrome's error output (the last part) and whether it has exited: reported if it does not start.
+  let chromeSaid = '', chromeGone = null;
+  chrome.stderr.on('data', d => { chromeSaid = (chromeSaid + d).slice(-4000); });
+  chrome.on('error', e => { chromeGone = e.code === 'ENOENT' ? 'not found (set $CHROME to the browser)' : String(e); });
+  chrome.on('exit', (code, signal) => { chromeGone ??= `stopped (${signal || `exit ${code}`})`; });
   const passed = [], conns = [];
   let tab;
   const js = async expr => {
@@ -112,7 +117,10 @@ export async function run(htmlPath, shotDir, body) {
     .map(e => JSON.stringify(e.params).slice(0, 200));
   try {
     const portFile = join(profile, 'DevToolsActivePort');
-    const port = await until(() => existsSync(portFile) && readFileSync(portFile, 'utf8').split('\n')[0], 'chrome');
+    const port = await until(() => {
+      if (chromeGone) throw new Error(`Chrome ${chromeGone}`);
+      return existsSync(portFile) && readFileSync(portFile, 'utf8').split('\n')[0];
+    }, 'chrome').catch(e => { throw new Error(`${e.message}${chromeSaid.trim() ? `; Chrome said: ${chromeSaid.trim().slice(-1500)}` : ''}`); });
     const version = await (await fetch(`http://127.0.0.1:${port}/json/version`)).json();
     const page = (await (await fetch(`http://127.0.0.1:${port}/json/list`)).json()).find(t => t.type === 'page');
     const browser = new Conn(version.webSocketDebuggerUrl); conns.push(browser); await browser.opened;
@@ -129,8 +137,10 @@ export async function run(htmlPath, shotDir, body) {
     process.exitCode = 1;
   } finally {
     conns.forEach(c => c.close());
+    // Remove the temporary profile and downloads after Chrome has exited.
+    const stopped = chromeGone ? Promise.resolve() : new Promise(r => chrome.once('exit', r));
     chrome.kill();
-    await sleep(300);
-    for (const dir of [downloads, profile]) try { rmSync(dir, { recursive: true, force: true }); } catch { /* left in the temp folder */ }
+    await Promise.race([stopped, sleep(5000)]);
+    for (const dir of [downloads, profile]) try { rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }); } catch { /* left in the temp folder */ }
   }
 }

@@ -31,10 +31,11 @@ def check(ok: bool, label: str) -> None:
 
 
 def refused(package: dict) -> bool:
-    try:
-        build.build(package, Path(tempfile.mkdtemp()) / "page.html")
-    except SystemExit:
-        return True
+    with tempfile.TemporaryDirectory() as tmp:
+        try:
+            build.build(package, Path(tmp) / "page.html")
+        except SystemExit:
+            return True
     return False
 
 
