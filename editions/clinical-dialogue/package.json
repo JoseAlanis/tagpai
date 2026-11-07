@@ -1,0 +1,16 @@
+{
+ "edition": {
+  "name": "TagpAI Clinical Dialogue",
+  "subtitle": "A human annotation tool for AI research"
+ },
+ "study": "demo",
+ "rater": "DEMO",
+ "package_id": "clinical-dialogue-demo",
+ "codebook": "pbt",
+ "codebooks": ["pbt"],
+ "practice": "bill",
+ "demo": true,
+ "intro": "A demonstration with a made-up case. The page makes no network requests of its own and stores nothing in the browser: when you reload or close it, it starts afresh.",
+ "hosting_notice": "Hosted on GitHub Pages; GitHub logs visitors' IP addresses (see its privacy statement).",
+ "batches": []
+}

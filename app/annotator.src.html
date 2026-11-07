@@ -1,0 +1,1533 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<link rel="icon" href="data:,">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src __SCRIPT_HASH__; img-src data:; font-src data:; connect-src 'none'; form-action 'none'; base-uri 'none'">
+<title>TagpAI</title>
+<style>
+/* Paper and ink. Colour appears where a rater marks something, plus a few small signals in violet. */
+:root, .light {
+  color-scheme: light;
+  --paper: #ffffff; --paper-2: #f5f5f7; --ink: #222226; --ink-2: #4a4a52; --quiet: #6b6b73; --rule: #e4e4e9;
+  --accent: #6d4fd6; --accent-soft: rgba(109, 79, 214, 0.12);
+  --ochre: #8a5a12; --danger: #b3261e;
+  --lift: 0 10px 34px rgba(20, 20, 30, 0.10), 0 1px 3px rgba(20, 20, 30, 0.06);
+  --mark-a: 0.30; --selection: rgba(109, 79, 214, 0.18); --veil: rgba(24, 24, 32, .42);
+}
+.dark {
+  color-scheme: dark;
+  --paper: #1d1d22; --paper-2: #27272d; --ink: #ececf1; --ink-2: #c4c4cc; --quiet: #9a9aa4; --rule: #36363e;
+  --accent: #a78bfa; --accent-soft: rgba(167, 139, 250, 0.16);
+  --ochre: #e0b56e; --danger: #f19999;
+  --lift: 0 14px 40px rgba(0, 0, 0, 0.5);
+  --mark-a: 0.40; --selection: rgba(167, 139, 250, 0.30); --veil: rgba(0, 0, 0, .58);
+}
+/* Embedded so every machine shows the same text (SIL Open Font License 1.1, Latin subsets):
+   the patient in Source Serif 4, the therapist and the page in Atkinson Hyperlegible Next. */
+@font-face { font-family: "Reader Serif"; font-style: normal; font-weight: 400; font-display: block;
+  src: url(data:font/woff2;base64,__READER_SERIF__) format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: "Reader Sans"; font-style: normal; font-weight: 400 700; font-display: block;
+  src: url(data:font/woff2;base64,__READER_SANS__) format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+:root {
+  --sans: "Reader Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --serif: "Reader Serif", Charter, Georgia, serif;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--paper); color: var(--ink); }
+body { font-family: var(--sans); font-size: 16px; line-height: 1.5; -webkit-font-smoothing: antialiased; font-variant-numeric: tabular-nums; }
+::selection { background: var(--selection); }
+button, select, input, textarea { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+[hidden] { display: none !important; }
+kbd { font: inherit; font-size: .85em; padding: 0 5px; border: 1px solid var(--rule); border-radius: 4px; color: var(--ink-2); }
+
+/* Header: one centred group (home, theme, help, save); a hairline that fills as replies are read */
+.topbar { position: sticky; top: 0; z-index: 20; display: flex; justify-content: center; align-items: center;
+          height: 60px; padding: 0 12px; background: var(--paper); }
+.tools { display: flex; align-items: center; gap: 4px; }
+.sid { padding: 0 8px 0 2px; font-size: 15px; color: var(--quiet); }
+.sid:empty { display: none; }
+.bar { position: sticky; top: 60px; z-index: 19; height: 1px; background: var(--rule); }
+.bar span { display: block; height: 2px; width: 0; background: var(--accent); transition: width .4s ease; }
+.btn { position: relative; height: 36px; padding: 0 14px; border-radius: 8px; border: 1px solid var(--rule);
+       background: var(--paper); font-size: 15px; cursor: pointer; white-space: nowrap; }
+.btn:hover { border-color: var(--quiet); }
+.btn.quiet { border-color: transparent; background: none; color: var(--ink-2); }
+.btn.quiet:hover { background: var(--paper-2); color: var(--ink); }
+.btn.quiet:active { background: var(--rule); }
+.btn.primary { background: var(--ink); border-color: var(--ink); color: var(--paper); }
+.btn.primary:hover { opacity: .86; }
+.btn.danger { color: var(--danger); }
+.btn:disabled { opacity: .35; cursor: default; }
+.icon { width: 36px; padding: 0; display: inline-grid; place-items: center; }
+#save.dirty::after { content: ""; position: absolute; top: -3px; right: -3px; width: 9px; height: 9px;
+                     border-radius: 50%; background: var(--accent); border: 2px solid var(--paper); }
+
+/* Reader: therapist on the left in sans, patient on the right in serif */
+main { padding: 56px 24px 0; }
+.reader { max-width: 52rem; margin: 0 auto; }
+#dialogue { display: flex; flex-direction: column; gap: 36px; }
+.line { max-width: 78%; transition: opacity .35s ease; }
+.line.therapist { align-self: flex-start; }
+.line.patient { align-self: flex-end; text-align: right; }
+.line.past { opacity: .4; }
+.line.past:hover { opacity: 1; }
+.line.enter, .wrap.enter { animation: arrive .5s ease-out both; }
+@keyframes arrive { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+.label { margin-bottom: 6px; user-select: none; }
+.label b { font-size: 16px; font-weight: 700; color: var(--ink); }
+.label span { margin-left: 8px; font-size: 14px; color: var(--quiet); }
+.text { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--ink); }
+.therapist .text { font-family: var(--sans); font-size: 20px; line-height: 1.55; }
+.patient .text { font-family: var(--serif); font-size: 22px; line-height: 1.6; }
+.tail { height: 50vh; }
+.fade { position: fixed; left: 0; right: 0; bottom: 0; height: 96px; pointer-events: none; z-index: 5;
+        background: linear-gradient(to bottom, transparent, var(--paper) 78%); }
+.next { position: fixed; left: 50%; bottom: 24px; z-index: 6; width: 48px; height: 48px; margin-left: -24px;
+        display: grid; place-items: center; border-radius: 50%; border: 1px solid var(--rule);
+        background: var(--paper); color: var(--ink-2); cursor: pointer; transition: border-color .15s ease, color .15s ease; }
+.next:hover { border-color: var(--ink); color: var(--ink); }
+.next.pulse { border-color: var(--accent); color: var(--accent); animation: ring 1.8s ease-out infinite; }
+@keyframes ring { 0% { box-shadow: 0 0 0 0 var(--accent-soft); } 100% { box-shadow: 0 0 0 18px transparent; } }
+
+/* Marks are highlighter strokes under the words; a second colour shows as an underline. */
+.hl { background: linear-gradient(to bottom, transparent 54%, rgba(var(--rgb), var(--mark-a)) 54%);
+      -webkit-box-decoration-break: clone; box-decoration-break: clone; cursor: pointer; }
+.hl.multi { box-shadow: 0 2px 0 rgba(var(--rgb2), .9); }
+/* The passage being worked on: a taller stroke if it is marked, a soft tint if not; never a box. */
+.hl.current { background: linear-gradient(to bottom, transparent 22%, rgba(var(--rgb), var(--mark-a)) 22%); }
+.current:not(.hl) { background: var(--selection); }
+/* Practice: the words to select glow in violet, with a callout above them. */
+.hint:not(.current) { background: rgba(var(--hint), .16); box-shadow: inset 0 -2px 0 rgb(var(--hint));
+                      -webkit-box-decoration-break: clone; box-decoration-break: clone; animation: beckon 2s ease-in-out infinite; }
+@keyframes beckon { 50% { background: transparent; } }
+.callout { position: absolute; z-index: 45; padding: 4px 10px; border-radius: 6px; background: rgb(var(--hint, 109, 79, 214)); color: #fff; font-weight: 600;
+           font-size: 14px; white-space: nowrap; pointer-events: none; animation: arrive .3s ease-out; }
+.callout::after { content: ""; position: absolute; left: 50%; top: -5px; margin-left: -5px;
+                  border: 5px solid transparent; border-top: 0; border-bottom-color: rgb(var(--hint, 109, 79, 214)); }
+.coach-target { box-shadow: 0 0 0 2px rgb(var(--rgb)) !important; }
+/* A new practice panel comes first: everything but the panel and its reply is veiled until it is handled. */
+.dim { position: fixed; inset: 0; z-index: 40; background: var(--veil); animation: fadein .25s ease-out; }
+/* The header stays above what is lifted (so nothing slides over it) but is veiled like the rest. */
+.touring .topbar { z-index: 42; }
+.touring .next.pulse { z-index: 41; }   /* the arrow a step points to stays bright */
+.touring .topbar::after { content: ""; position: absolute; inset: 0; background: var(--veil); pointer-events: none; }
+@keyframes fadein { from { opacity: 0; } }
+.lifted { position: relative; z-index: 41; }
+.line.lifted { margin: -16px -20px; padding: 16px 20px; border-radius: 14px; background: var(--paper); }
+.coach.lifted { box-shadow: var(--lift); }
+.wrap.lifted { margin-left: -40px; margin-right: -40px; padding: 36px 40px 40px; border-top: 0; border-radius: 16px; background: var(--paper); }
+.waiting #dialogue { -webkit-user-select: none; user-select: none; }
+
+/* Raw output: under its reply, behind a hairline; the part the other speaker never saw is underlined. */
+.rawbox { margin-top: 14px; padding: 2px 0 2px 14px; border-left: 2px solid var(--rule); text-align: left; }
+.rawbox .text { font-family: var(--sans); font-size: 17px; line-height: 1.55; color: var(--ink-2); }
+.raw-label { display: block; margin-bottom: 2px; font-size: 13px; color: var(--quiet); user-select: none; }
+.removed { color: var(--ochre); text-decoration: underline wavy var(--ochre); text-decoration-thickness: 1px; text-underline-offset: 5px; }
+
+/* Toolbar */
+.toolbar { position: absolute; z-index: 46; max-width: min(800px, calc(100vw - 16px)); padding: 6px;
+           background: var(--paper); border: 1px solid var(--rule); border-radius: 12px;
+           box-shadow: var(--lift); animation: pop .12s ease-out; font-family: var(--sans); text-align: left; }
+@keyframes pop { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+.tb-row { display: flex; flex-wrap: wrap; align-items: center; gap: 2px; }
+.chip { display: inline-flex; align-items: center; gap: 8px; height: 36px; padding: 0 10px; border-radius: 8px;
+        border: 1px solid transparent; background: none; font-size: 15px; cursor: pointer; white-space: nowrap; }
+.chip:hover { background: var(--paper-2); }
+.chip .dot, .tb-head .dot, .mtag .dot, .tb-mark .dot { width: 9px; height: 9px; border-radius: 50%; background: rgb(var(--rgb)); flex: none; }
+.chip .key { font-size: 12px; color: var(--quiet); }
+.chip.on { background: rgba(var(--rgb), .14); border-color: rgba(var(--rgb), .5); }
+.tb-msg { padding: 6px 10px; font-size: 15px; color: var(--ink-2); }
+.tb-coach { max-width: 580px; margin-bottom: 4px; padding: 6px 10px 9px; border-bottom: 1px solid var(--rule); font-size: 14px; color: var(--accent); }
+.tb-marks { margin: 4px 6px 2px; padding-top: 6px; border-top: 1px solid var(--rule); display: grid; gap: 4px; }
+.tb-mark { display: flex; align-items: baseline; gap: 8px; font-size: 14px; color: var(--ink-2); max-width: 580px; overflow-wrap: anywhere; }
+.tb-note { display: flex; flex-direction: column; gap: 9px; padding: 8px 8px 4px; width: min(780px, calc(100vw - 30px)); }
+.tb-head { display: flex; align-items: center; gap: 8px; font-size: 16px; font-weight: 700; }
+.tb-head small { font-weight: 400; font-size: 14px; color: var(--quiet); }
+.pick-group { margin-bottom: 6px; font-size: 13px; color: var(--quiet); }
+.picks { display: flex; flex-wrap: wrap; gap: 6px; }
+.pick { height: 30px; padding: 0 11px; border-radius: 999px; border: 1px solid var(--rule); background: var(--paper);
+        font-size: 14px; cursor: pointer; white-space: nowrap; }
+.pick:hover { border-color: var(--quiet); }
+.pick-block.dependent { margin-left: 4px; padding-left: 12px; border-left: 2px solid rgba(var(--rgb), .45); }
+.pick-block .pick-hint { margin-top: 6px; }
+.pick[aria-pressed="true"] { background: rgba(var(--rgb), .16); border-color: rgba(var(--rgb), .8); color: var(--ink); }
+.pick-hint { font-size: 14px; color: var(--ochre); }
+.tb-note textarea, .wrap textarea { width: 100%; resize: vertical; min-height: 48px; padding: 9px 11px; border-radius: 8px;
+  border: 1px solid var(--rule); background: var(--paper); color: var(--ink); font-size: 16px; }
+.tb-note textarea:focus, .wrap textarea:focus { outline: none; border-color: var(--ink-2); }
+.wrap .limit { margin-top: 6px; }
+.tb-actions { display: flex; align-items: center; justify-content: flex-end; gap: 6px; }
+.tb-actions .keys-hint { margin-right: auto; font-size: 13px; color: var(--quiet); }
+
+/* Practice card: in the flow, centred under the newest reply */
+.coach { margin: 30px auto 0; max-width: 34rem; padding: 14px 20px; border: 1px solid var(--rule); border-radius: 12px;
+         background: var(--paper); animation: arrive .35s ease-out; }
+.coach-step { margin-bottom: 6px; font-size: 14px; color: var(--accent); }
+.coach-title { margin-bottom: 6px; font-size: 22px; font-weight: 700; }
+.coach-title:empty { display: none; }
+#coach-text { font-size: 17px; line-height: 1.5; white-space: pre-line; }
+.kw { font-weight: 700; background: linear-gradient(to bottom, transparent 54%, rgba(var(--rgb), var(--mark-a)) 54%); }
+.coach-hint { margin-top: 10px; font-size: 15px; color: var(--ochre); }
+.coach-hint:empty { display: none; }
+.coach-actions { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 10px; }
+.coach-right { display: flex; gap: 6px; }
+
+/* Wrap-up */
+.wrap { margin-top: 80px; padding-top: 32px; border-top: 1px solid var(--rule); }
+.wrap h2 { margin: 0; font-size: 22px; font-weight: 700; }
+.wrap h3 { margin: 30px 0 12px; font-size: 17px; font-weight: 700; }
+.marks { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 10px 20px; font-size: 16px; }
+.mtag { display: flex; align-items: center; align-self: start; gap: 9px; color: var(--ink-2); white-space: nowrap; min-height: 28px; }
+.mlist { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
+.mitem { max-width: 100%; padding: 2px 0; border: 0; background: none; cursor: pointer; text-align: left; font-size: 16px; line-height: 1.5; }
+.mitem q { quotes: "“" "”"; background: linear-gradient(to bottom, transparent 54%, rgba(var(--rgb), var(--mark-a)) 54%);
+           -webkit-box-decoration-break: clone; box-decoration-break: clone; }
+.mitem small { display: block; font-size: 14px; color: var(--quiet); overflow-wrap: anywhere; }
+.none { color: var(--quiet); font-size: 15px; line-height: 28px; }
+.q { margin: 0 0 22px; }
+.q-text { margin-bottom: 9px; font-size: 17px; }
+.q-text .opt { color: var(--quiet); font-size: 14px; margin-left: 8px; }
+.seg { display: inline-flex; flex-wrap: wrap; gap: 6px; }
+.seg button { min-width: 52px; padding: 6px 14px; border-radius: 8px; border: 1px solid var(--rule);
+              background: var(--paper); font-size: 15px; cursor: pointer; }
+.seg button:hover:not(:disabled) { border-color: var(--quiet); }
+.seg button[aria-pressed="true"] { background: var(--ink); border-color: var(--ink); color: var(--paper); }
+.seg button:disabled { cursor: default; }
+.submit-row { display: flex; align-items: center; gap: 12px; margin-top: 28px; flex-wrap: wrap; }
+.submit-row .why, .submitted { font-size: 15px; color: var(--quiet); }
+
+/* Welcome and home */
+.welcome, .home { max-width: 42rem; margin: 0 auto; }
+.welcome { padding-top: 4vh; }
+.welcome h1, .home h1 { margin: 0 0 8px; font-size: 30px; font-weight: 700; letter-spacing: -.01em; }
+.welcome .sub, .home .sub { margin: 0 0 28px; color: var(--ink-2); font-size: 18px; line-height: 1.5; }
+.brand { margin: 0 0 18px; font-size: 15px; color: var(--quiet); }
+.brand b { margin-right: 8px; font-weight: 700; color: var(--ink-2); }
+.welcome .notice { margin: -14px 0 0; font-size: 15px; color: var(--quiet); }
+.welcome h2, .home h2 { margin: 44px 0 10px; font-size: 18px; font-weight: 700; }
+.small { margin: 0 0 8px; font-size: 15px; color: var(--quiet); }
+/* A demo copy collects nothing: no saving, no experience questions, no batches. */
+.demo .not-demo { display: none !important; }
+.check { display: flex; gap: 12px; align-items: flex-start; padding: 12px 0; border-bottom: 1px solid var(--rule); font-size: 17px; cursor: pointer; }
+.check input { margin-top: 5px; width: 17px; height: 17px; accent-color: var(--ink); flex: none; }
+.actions { display: flex; gap: 10px; margin-top: 28px; flex-wrap: wrap; }
+.sessions { list-style: none; margin: 0; padding: 0; }
+.practice-row { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin: -8px 0 18px; font-size: 15px; color: var(--quiet); }
+.batch-head { display: flex; justify-content: space-between; align-items: baseline; padding: 22px 4px 8px; border-bottom: 1px solid var(--rule); }
+.batch-head b { font-size: 16px; }
+.batch-head span { font-size: 15px; color: var(--quiet); }
+.srow { width: 100%; display: grid; grid-template-columns: 4.5rem minmax(0, 1fr) auto 64px; align-items: center; gap: 16px;
+        padding: 15px 4px; border: 0; border-bottom: 1px solid var(--rule); background: none; cursor: pointer; text-align: left; font-size: 17px; }
+.srow:hover { background: var(--paper-2); }
+.srow b { font-weight: 700; }
+.srow .st { color: var(--ink-2); font-size: 16px; }
+.srow .st.done { color: var(--accent); }
+.srow .n { color: var(--quiet); font-size: 15px; }
+.mini { height: 2px; background: var(--rule); }
+.mini span { display: block; height: 100%; background: var(--ink-2); }
+.setting { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 11px 0;
+           border-bottom: 1px solid var(--rule); font-size: 17px; flex-wrap: wrap; }
+.setting select { height: 36px; border-radius: 8px; border: 1px solid var(--rule); background: var(--paper); padding: 0 8px; font-size: 15px; }
+
+/* Help */
+.overlay { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; padding: 16px; background: rgba(10, 10, 15, .4); }
+.sheet { width: min(680px, 100%); max-height: calc(100vh - 32px); overflow: auto; padding: 28px 32px;
+         background: var(--paper); border: 1px solid var(--rule); border-radius: 14px; box-shadow: var(--lift); }
+.sheet h2 { margin: 0 0 14px; font-size: 24px; font-weight: 700; }
+.sheet h3 { margin: 26px 0 10px; font-size: 18px; font-weight: 700; }
+.sheet ol { margin: 0 0 8px; padding-left: 1.3em; font-size: 16px; line-height: 1.55; }
+.sheet li + li { margin-top: 6px; }
+.sheet p { margin: 0 0 8px; font-size: 16px; line-height: 1.55; }
+.sheet .about { margin: 24px 0 0; font-size: 14px; color: var(--quiet); }
+.legend { display: grid; grid-template-columns: max-content 1fr; gap: 12px 18px; font-size: 16px; line-height: 1.5; }
+.legend .mtag { align-items: baseline; min-height: 0; }
+.legend .mtag .dot { transform: translateY(-1px); }
+.legend .who { color: var(--quiet); font-size: 14px; }
+.areas { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.areas span { padding: 1px 9px; border-radius: 999px; border: 1px solid var(--rule); font-size: 14px; color: var(--ink-2); }
+.keys { display: grid; grid-template-columns: max-content 1fr; gap: 8px 18px; font-size: 16px; }
+
+@media (max-width: 640px) {
+  main { padding: 28px 16px 0; }
+  .line { max-width: 92%; }
+  .therapist .text { font-size: 18px; }
+  .patient .text { font-size: 20px; }
+  .srow { grid-template-columns: 3.5rem minmax(0, 1fr) auto; }
+  .srow .mini { display: none; }
+  .marks { grid-template-columns: minmax(0, 1fr); }
+  .sheet { padding: 22px 20px; }
+  .wrap.lifted { margin-left: -12px; margin-right: -12px; padding: 24px 12px; }
+  .line.lifted { margin: -12px; padding: 12px; }   /* the lit card stays inside the 16px gutter */
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+</style>
+</head>
+<body>
+<header class="topbar">
+  <nav class="tools" aria-label="Page">
+    <button class="btn quiet icon" id="home-btn" title="All sessions" aria-label="All sessions"><svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><path d="M3.5 9.2 10 3.8l6.5 5.4V16a.8.8 0 0 1-.8.8h-3.4v-4.6H7.7v4.6H4.3a.8.8 0 0 1-.8-.8z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg></button>
+    <span class="sid" id="sid"></span>
+    <button class="btn quiet icon" id="theme-btn" title="Light or dark" aria-label="Switch between light and dark"><svg viewBox="0 0 20 20" width="17" height="17" aria-hidden="true"><circle cx="10" cy="10" r="6.8" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M10 3.2a6.8 6.8 0 0 1 0 13.6z" fill="currentColor"/></svg></button>
+    <button class="btn quiet icon" id="help-btn" title="Help (?)" aria-label="Help">?</button>
+    <button class="btn primary not-demo" id="save">Save</button>
+  </nav>
+</header>
+<div class="bar" aria-hidden="true"><span id="bar"></span></div>
+
+<main>
+  <section class="welcome" id="welcome" hidden>
+    <p class="brand"></p>
+    <h1>Welcome</h1>
+    <p class="sub">This copy is for rater <b id="w-rater"></b>. It works offline and makes no network requests of its own: your ratings stay in this browser until you save them to a file and send that file back.</p>
+    <p class="notice" id="w-hosting" hidden></p>
+    <h2 class="not-demo">Your experience</h2>
+    <p class="small not-demo">We do not ask for your name or any other personal details. Tick what applies.</p>
+    <div class="not-demo" id="w-experience"></div>
+    <div class="actions">
+      <button class="btn primary" id="w-start">Continue to a short practice</button>
+      <button class="btn quiet" id="w-skip">Skip the practice</button>
+      <button class="btn quiet not-demo" id="w-load">Continue from a saved file…</button>
+    </div>
+  </section>
+  <section class="home" id="home" hidden>
+    <p class="brand"></p>
+    <h1>Sessions</h1>
+    <p class="sub" id="home-sub"></p>
+    <div class="practice-row">
+      <button class="btn" id="home-practice">Play the practice</button>
+      <span>A five-minute walk-through on a made-up conversation.</span>
+    </div>
+    <ol class="sessions" id="session-list"></ol>
+    <div class="actions not-demo"><button class="btn" id="add-batch">Add a batch…</button></div>
+    <input id="batch-file" type="file" accept=".json,application/json" hidden>
+    <h2 class="not-demo">Your experience</h2>
+    <div class="not-demo" id="h-experience"></div>
+    <h2 class="not-demo">Saved file</h2>
+    <div class="setting not-demo"><span>Continue from a saved file</span><button class="btn" id="load">Load…</button></div>
+    <div class="setting" id="codebook-row"><span>Codebook</span><select id="codebook" aria-label="Codebook"></select></div>
+    <input id="file" type="file" accept=".json,application/json" hidden>
+    <div style="height: 80px"></div>
+  </section>
+  <div class="reader" id="reader" hidden>
+    <div id="dialogue"></div>
+    <div class="coach" id="coach" role="status" aria-live="polite" hidden>
+      <div class="coach-step" id="coach-step"></div>
+      <div class="coach-title" id="coach-title"></div>
+      <div id="coach-text"></div>
+      <div class="coach-hint" id="coach-hint"></div>
+      <div class="coach-actions">
+        <button class="btn quiet" id="coach-skip">Skip practice</button>
+        <div class="coach-right">
+          <button class="btn quiet" id="coach-back" hidden>Back</button>
+          <button class="btn primary" id="coach-go" hidden></button>
+        </div>
+      </div>
+    </div>
+    <section class="wrap" id="wrap" aria-label="Wrap-up" hidden></section>
+    <div class="tail"></div>
+  </div>
+</main>
+<div class="fade" id="fade"></div>
+<button class="next" id="next" title="Next reply (Space)" aria-label="Next reply"><svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><path d="M5 7.5 10 12.5 15 7.5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+<div class="toolbar" id="toolbar" role="toolbar" aria-label="Mark the selected passage" hidden></div>
+<div class="callout" id="callout" aria-hidden="true" hidden></div>
+<div class="dim" id="dim" hidden></div>
+
+<div class="overlay" id="help" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="help-title">
+    <h2 id="help-title">How it works</h2>
+    <ol>
+      <li>The conversation appears one reply at a time, the therapist on the left and the patient on the right. Read a reply, then press <kbd>Space</kbd> or the arrow at the bottom for the next. Earlier replies stay above.</li>
+      <li>Select words and pick a colour, or press its number. Then say in a few words why you marked it. Some colours need a note; one of the suggested words counts.</li>
+      <li>Click a highlight to see, change or remove what is on it. One passage can carry several colours.</li>
+      <li>Under some replies is the <b>raw output</b>: what the model wrote before it was cleaned. The underlined part never reached the other speaker. Read it, and mark problems there with Form.</li>
+      <li>After the last reply come your marks and a few questions. A reply you moved past without marking counts as "nothing here".</li>
+    </ol>
+    <h3>What to mark</h3>
+    <div class="legend" id="legend"></div>
+    <h3 class="not-demo">Saving and batches</h3>
+    <p class="not-demo"><span id="help-storage">The browser keeps a copy after every change.</span> <b>Save</b> writes the file you send back; a dot on it means some changes are not in a file yet. New sessions come as a batch file, which you add on the home page. Please do not write anything about yourself or other people in notes.</p>
+    <h3>Keys</h3>
+    <div class="keys">
+      <span><kbd>Space</kbd> or <kbd>↓</kbd></span><span>Next reply</span>
+      <span><kbd>1</kbd> to <kbd>5</kbd></span><span>Pick a colour while the toolbar is open</span>
+      <span><kbd>Enter</kbd></span><span>Save the note</span>
+      <span><kbd>Esc</kbd></span><span>Change colour, or close the toolbar</span>
+      <span class="not-demo"><kbd>Ctrl</kbd> <kbd>S</kbd></span><span class="not-demo">Save to file</span>
+    </div>
+    <div class="actions">
+      <button class="btn" id="help-close">Close</button>
+      <button class="btn quiet" id="help-practice">Replay the practice</button>
+    </div>
+    <p class="about" id="about"></p>
+  </div>
+</div>
+
+<script>
+"use strict";
+// Inside another page (a frame), that page could steer the marks or overlay the reader: refuse to start.
+if (window.self !== window.top) {
+  document.body.replaceChildren(Object.assign(document.createElement("p"), { textContent: "This page does not run inside another page. Open it directly." }));
+  throw new Error("refused to run inside a frame");
+}
+/* ---------------- Package: who this copy is for, what it holds, which codebook ---------------- */
+// Written by the builder (build.py): the rater's code (no name, e-mail or other personal detail), the
+// conversations as batches of sessions (each line { turn, speaker, text, raw? }), the codebook to use and
+// the codebooks offered (more than one shows a choice on the home page). Optional: `edition` ({ name,
+// subtitle }: the page title and the line above the headings), `practice` (which practice, default "bill"),
+// `intro` (the welcome line of a demo copy, in place of the rater line), `hosting_notice` (shown on the
+// welcome when the page is served over the web, not when opened from a file), `demo` (keep nothing,
+// collect nothing) and `storage: "browser"` (keep a copy in this browser; default: memory only).
+// The app's version goes into every ratings file, as a record of provenance (not proof of what ran).
+const APP = { name: "TagpAI", subtitle: "A human annotation tool for AI research", version: "0.0.1" };
+const PACKAGE = __PACKAGE__;
+const EMBEDDED = PACKAGE.batches;
+// A demo copy (`demo: true`) keeps nothing: no browser storage, so every visit starts afresh at the
+// welcome, and nothing can be saved to a file.
+const DEMO = PACKAGE.demo === true;
+// Memory-only by default: nothing, not even an added batch, stays in the browser; work lives in the saved
+// file (save before closing, load to continue). Only `storage: "browser"` keeps a copy in the browser, for
+// one's own work on one's own device, never for a study. A demo is always memory-only.
+const MEMORY = DEMO || PACKAGE.storage !== "browser";
+
+function dialogue(replies, opener) {
+  // Opener is turn 0; then each turn is the patient line followed by the therapist reply.
+  const lines = [{ turn: 0, speaker: "therapist", text: opener }];
+  replies.forEach((r, k) => {
+    const [text, raw] = Array.isArray(r) ? r : [r, null];
+    const line = { turn: Math.floor(k / 2) + 1, speaker: k % 2 ? "therapist" : "patient", text };
+    if (raw !== null) line.raw = raw;
+    lines.push(line);
+  });
+  return lines;
+}
+
+/* ---------------- Codebooks ---------------- */
+// A pick group may depend on another (`needs`: shown, and kept, only once one of those items is picked),
+// ask for its own pick once shown (`ask`), or nudge for itself when a specifier is picked without it
+// (`nudge`). `legend` names the group whose items help lists under the colour.
+// How the area is known is a separate judgement about the area, asked once one is picked.
+const BASIS = ["Named in the passage", "Inferred from context"];
+const CONTEXT = BASIS[1];
+const ASPECTS = ["Duration", "Frequency", "Cause", "Coping", "Impact on daily life", "Burden"];
+const clinical = (areas, help) => ({ id: "clinical", label: "Clinical", speakers: ["patient"], color: "#7c5ce6", noteRequired: true,
+  legend: "Symptom area",
+  picks: [{ group: "Symptom area", items: areas,
+            nudge: { when: ASPECTS, text: "Which problem is this about? Pick it even if the passage doesn't name it." } },
+          { group: "How the area is known", items: BASIS, single: true, needs: areas,
+            ask: "Named in the passage, or inferred from context?",
+            tips: { [CONTEXT]: "Clear from the question or earlier turns, not named in this passage" } },
+          { group: "Aspect specifier", items: ASPECTS }],
+  help });
+const ASSUMES = { id: "assumes", label: "Assumes", speakers: ["therapist"], color: "#e8590c",
+  picks: [{ group: "Kind", items: ["States it", "Asks as if it were so"] }],
+  help: "The therapist states or asks about something the patient has not said, such as “How long have you been struggling with fatigue?” before any tiredness came up." };
+const FORM = { id: "form", label: "Form", speakers: ["patient", "therapist"], raw: true, color: "#e03131", noteRequired: true,
+  picks: [{ group: "Kind", items: ["Speaks as the other person", "Narration", "Stage directions", "Markup", "Repetition"] }],
+  help: "Something wrong with how it is said: a speaker talks as the other person or narrates, stage directions like *shrugs*, markup, repetition. Also in the raw output." };
+const SCALE = ["Poor", "Mixed", "Good"];
+
+// Process-based (demo): a social anxiety case, adapted from Hofmann (2025, Behavior Therapy 56, 199–212).
+// Clinical marks the problem as the patient reports it, Process the four change processes of the paper's
+// Table 3, each with a maladaptive and an adaptive side, and Strategy the four treatment strategies of its
+// Table 4. Names as in the tables.
+const SAD_AREAS = ["Fear of being judged", "Anxiety", "Physical symptoms", "Negative self-image", "Low mood", "Avoidance", "Safety behaviours"];
+const PROCESSES = ["Distress tolerance", "Social skills", "Self-focused attention", "Arousal reduction"];
+const SIDES = ["Maladaptive", "Adaptive"];
+const STRATEGIES = ["Exposure", "Social skills training", "Attention training", "Relaxation"];
+const PROCESS = { id: "process", label: "Process", speakers: ["patient"], color: "#1098ad", noteRequired: true, legend: "Process",
+  picks: [{ group: "Process", items: [...PROCESSES, "Other process"], single: true,
+            tips: { "Distress tolerance": "Bearing anxiety or distress instead of escaping it",
+                    "Social skills": "Handling the social situation itself",
+                    "Self-focused attention": "Attention turned on oneself: how one looks, sounds or comes across",
+                    "Arousal reduction": "Bringing bodily arousal down",
+                    "Other process": "Name it in the note" } },
+          { group: "Side", items: SIDES, single: true, needs: [...PROCESSES, "Other process"], ask: "Maladaptive or adaptive?",
+            tips: { Maladaptive: "Keeps the problem going, such as not being able to bear the distress",
+                    Adaptive: "Works against it, such as staying with the distress" } }],
+  help: "What keeps the problem going, or works against it, in what the patient says. Each process has a maladaptive and an adaptive side. Symptoms say what is wrong; processes say what keeps it going." };
+const STRATEGY = { id: "strategy", label: "Strategy", speakers: ["therapist"], color: "#2f9e44", noteRequired: true, legend: "Strategy",
+  picks: [{ group: "Strategy", items: [...STRATEGIES, "Other strategy"], tips: { "Other strategy": "Name it in the note" } }],
+  help: "A treatment strategy the therapist uses or proposes, such as exposure or attention training." };
+
+const CODEBOOKS = {
+  pbt: {
+    name: "Process-based (demo)",
+    tags: [clinical(SAD_AREAS, "What the patient reports about the problem: a symptom and its aspects (duration, frequency, cause, coping, impact on daily life, burden). Pick the area even when the passage does not name it, and say how you know it."),
+           PROCESS, STRATEGY, ASSUMES, FORM],
+    questions: [
+      { id: "target_process", type: "choice", text: "Which process would you target first?", options: PROCESSES,
+        values: ["distress_tolerance", "social_skills", "self_focused_attention", "arousal_reduction"] },
+      { id: "strategy_fit", type: "choice", text: "Does the therapist's strategy fit that process?", options: ["No", "Partly", "Yes"], values: ["no", "partly", "yes"] },
+      { id: "naturalness", type: "scale", text: "How natural does the conversation sound?", labels: SCALE },
+      { id: "note", type: "text", text: "Anything else", optional: true }
+    ]
+  }
+};
+const EXPERIENCE = [
+  ["psychology", "I studied psychology, or am studying it"],
+  ["diagnostics", "I have experience with clinical diagnostics, such as clinical interviews or assessments"],
+  ["counselling", "I have counselling or therapy experience beyond university seminars"]
+];
+
+/* ---------------- Practice steps ---------------- */
+// Each step advances by itself once its condition holds. `hint` glows the words to select, `ring` and
+// `ringPicks` outline what to press in the toolbar, `expect` gives a gentle word for a wrong colour.
+const marked = (st, line, tag, version = "text") => st.marks.some(m => m.line === line && m.tag === tag && m.version === version);
+// The page stays veiled through the practice; each panel lights up together with the reply it is about.
+// The welcome is a `gate`: it comes alone, and nothing reacts until Start. `info` panels explain and hold
+// the conversation still until Continue; `pulse` panels reveal the next reply; the others wait for the mark
+// they ask for.
+
+// The process-based practice: a made-up first session with Bill (case adapted from Hofmann, 2025; the
+// page does not cite it). Symptoms first, then processes (both sides), the raw output, the strategies.
+const BILL = dialogue([
+  "There's a presentation I have to give in my class next month. Just thinking about it, my heart starts racing. I'm socially awkward, and everyone will see it.",
+  "That sounds really hard. What goes through your mind when you picture yourself standing up there?",
+  "That my anxiety will get out of control. I can't stand that feeling, I just want to get out of there. I've even thought about skipping class that day.",
+  "So when the anxiety rises, you want to escape. Has there ever been a time when you stayed anyway?",
+  ["Once, in a seminar. I was shaking, but I stayed until the end, and it was okay. Still, all I could think about was whether they could see my hands.",
+   "*looks at the floor* Once, in a seminar. I was shaking, but I stayed until the end, and it was okay. Still, all I could think about was whether they could see my hands."],
+  "Let's try something. You could give the first minute of your talk here, and let the anxiety be there without stopping. While you speak, keep your attention on me, your listener, not on your hands."
+], "Hello, I'm glad you came in. What's been on your mind the most lately?");
+const markedWith = (st, line, tag, pick) => st.marks.some(m => m.line === line && m.tag === tag && m.picks.includes(pick));
+const TOUR_BILL = [
+  { title: "Welcome to this conversation annotation tool", button: "Start", gate: true,
+    text: "During this short practice, I'll walk you through how annotation works, using a made-up session with a patient we'll call Bill: a 30-year-old student who is very anxious about a presentation he has to give in class. It takes about five minutes, and nothing you do here is saved.\n\nA quick word on what you'd be doing: the sessions are simulated. A language model plays both the therapist and the patient. You'll mark three things: the problems the patient describes (symptoms), the processes that keep those problems going or work against them, and the strategies the therapist uses. Ready? Let's start." },
+  { text: "Every conversation starts with the therapist's opening. A good opening, like the therapist's questions later on, steers towards what matters most in the patient's life right now. Once you've read it, press Continue. This brings up Bill's reply.\n\nLater, the down arrow at the bottom of the page does the same. On a computer you can also press Space or the down-arrow key on your keyboard.",
+    pulse: true, button: "Continue", done: st => st.shown >= 2 },
+  { info: true, title: "Let's look at Bill's reply together",
+    text: "Here is Bill's first reply. Take a moment to read it.\n\nBill names what's on his mind, a presentation next month, and then two things that are clinically relevant: his heart races just thinking about it, and he sees himself as socially awkward. These are symptoms: they describe the problem as Bill experiences it.\n\nPassages like these are what you mark with the colour Clinical. Let's mark them together, one at a time." },
+  { text: "First, select the words that glow. Just drag across them with your mouse (on a phone, press and hold).",
+    hint: { line: 1, phrase: "my heart starts racing" }, done: () => target && target.line === 1 },
+  { text: "Nice! A toolbar has opened with the colours that fit the patient's words. Pick Clinical (or press 1).", ring: ["clinical"],
+    done: () => mode === "note" && draft && draft.tag.id === "clinical" },
+  { text: "Now we say why we marked it, in two small steps:\n1. The symptom area: “Physical symptoms”.\n2. How you know it: Bill says it directly, so “Named in the passage”.\nThen press Enter or Save.",
+    ringPicks: ["Physical symptoms", BASIS[0]],
+    expect: { line: 1, tag: "clinical" }, done: st => markedWith(st, 1, "clinical", "Physical symptoms") },
+  { text: "That's your first mark! One reply can hold several marks. “I'm socially awkward” is how Bill sees himself, and this view of himself feeds his fear of the presentation.\n\nSelect the glowing words and mark them Clinical: “Negative self-image”, then “Named in the passage”.",
+    hint: { line: 1, phrase: "I'm socially awkward" }, ring: ["clinical"], ringPicks: ["Negative self-image", BASIS[0]],
+    expect: { line: 1, tag: "clinical" }, done: st => markedWith(st, 1, "clinical", "Negative self-image") },
+  { text: "Well done, two marks in one reply! (“Everyone will see it” would be “Fear of being judged”; in real sessions you'd mark that too.) If the suggested words don't quite say it, you can always add a few words of your own in the note field.\n\nLet's read on: press Next reply for the therapist's response.",
+    pulse: true, done: st => st.shown >= 3 },
+  { text: "Here the therapist asks what goes through Bill's mind when he pictures the talk. It's an open question that builds on what he said, so there's nothing to mark. Not every reply needs a mark: when a reply seems fine, simply read on.\n\nPress Next reply for Bill's answer.",
+    pulse: true, done: st => st.shown >= 4 },
+  { info: true, title: "Symptoms and processes",
+    text: "Bill answers: “That my anxiety will get out of control. I can't stand that feeling, I just want to get out of there. I've even thought about skipping class that day.”\n\nSkipping class is avoidance, a symptom: it says what is wrong. “I can't stand that feeling” says something else: why the anxiety turns into escape. That's a process, the second thing you annotate, with the colour Process.\n\nThe toolbar offers four processes: distress tolerance, social skills, self-focused attention and arousal reduction. Each has two sides. Here Bill can't bear the distress: the maladaptive side of distress tolerance, the side that keeps the problem going." },
+  { text: "Let's mark it: select the glowing words and pick Process (or press 2). Then choose the process, “Distress tolerance”, and its side, “Maladaptive”.",
+    hint: { line: 3, phrase: "I can't stand that feeling" }, ring: ["process"], ringPicks: ["Distress tolerance", "Maladaptive"],
+    expect: { line: 3, tag: "process" }, done: st => markedWith(st, 3, "process", "Distress tolerance") },
+  { text: "Great. In real sessions you'd also mark “skipping class” as Clinical, “Avoidance”.\n\nNow let's see how the therapist responds.", pulse: true, done: st => st.shown >= 5 },
+  { text: "The therapist puts two things Bill said together: when the anxiety rises, he wants to escape. Then the therapist asks about a time he stayed anyway. A good question that builds on what Bill said, so there's nothing to mark.\n\nPress Next reply.",
+    pulse: true, done: st => st.shown >= 6 },
+  { info: true, title: "Processes have two sides",
+    text: "Bill remembers: “I was shaking, but I stayed until the end, and it was okay.” That's distress tolerance again, but now its adaptive side: he stayed with the distress, and it passed. Marking both sides shows whether a process shifts over the course of therapy.\n\nIn the same breath he adds: “All I could think about was whether they could see my hands.” His attention is turned on himself: self-focused attention, on its maladaptive side." },
+  { text: "Your turn: select the glowing words and mark them Process: “Distress tolerance”, “Adaptive”.",
+    hint: { line: 5, phrase: "I stayed until the end, and it was okay" }, ring: ["process"], ringPicks: ["Distress tolerance", "Adaptive"],
+    expect: { line: 5, tag: "process" }, done: st => st.marks.some(m => m.line === 5 && m.tag === "process" && m.picks.includes("Adaptive")) },
+  { text: "And the second one: mark it Process, “Self-focused attention”, “Maladaptive”.",
+    hint: { line: 5, phrase: "all I could think about was whether they could see my hands" }, ring: ["process"], ringPicks: ["Self-focused attention", "Maladaptive"],
+    expect: { line: 5, tag: "process" }, done: st => markedWith(st, 5, "process", "Self-focused attention") },
+  { info: true, title: "The raw output: a quality check",
+    text: "See the box under Bill's reply? That's the raw output.\n\nSince the conversation is simulated, the program sometimes makes mistakes. Its text is cleaned up before the other side sees it, and the raw output shows what it actually wrote. Here, while playing Bill, the program added a stage direction: “*looks at the floor*”. The underlined part never reached the therapist.\n\nThat isn't clinical content, it's a fault of the simulation. You mark faults like this with Form. Think of it as quality control: besides the clinical content, you're also checking the form of the conversation." },
+  { text: "Let's mark it: select the underlined words and pick Form, then “Stage directions”.",
+    hint: { line: 5, phrase: "*looks at the floor*", version: "raw", callout: "Select the underlined part" },
+    ring: ["form"], ringPicks: ["Stage directions"], expect: { line: 5, tag: "form", version: "raw" }, done: st => marked(st, 5, "form", "raw") },
+  { text: "Nearly there. Next comes the therapist's last reply.", pulse: true, done: st => st.shown >= 7 },
+  { info: true, title: "What the therapist does",
+    text: "The therapist proposes something to try. That's the third thing you annotate: the strategies the therapist uses, with the colour Strategy.\n\nA good strategy works on the processes that keep the problem going. Exposure works on distress tolerance (staying with the anxiety instead of escaping it), and attention training on self-focused attention (turning attention outwards): the two processes you just marked. Let's see what the therapist chose." },
+  { text: "Select the glowing words and pick Strategy (or press 3), then “Exposure”.",
+    hint: { line: 6, phrase: "give the first minute of your talk here, and let the anxiety be there without stopping" }, ring: ["strategy"], ringPicks: ["Exposure"],
+    expect: { line: 6, tag: "strategy" }, done: st => markedWith(st, 6, "strategy", "Exposure") },
+  { text: "And the second part: mark it Strategy, “Attention training”. Together, the two strategies work on both processes you marked in Bill's replies.",
+    hint: { line: 6, phrase: "keep your attention on me, your listener, not on your hands" }, ring: ["strategy"], ringPicks: ["Attention training"],
+    expect: { line: 6, tag: "strategy" }, done: st => markedWith(st, 6, "strategy", "Attention training") },
+  { text: "That was the last reply. After each conversation, you'll look over your marks and answer a few short questions.",
+    pulse: true, button: "Show them", done: st => st.done },
+  { title: "Your marks and a few questions", button: "Finish",
+    text: "Here are your marks, sorted by colour. Click any of them to jump back to that spot. Below are a few questions about the whole conversation: which process would you target first, does the therapist's strategy fit it, and how natural did it sound?\n\nTwo things this practice skipped: a Clinical mark can also say how long, how often or how much (the aspect specifier), and the colour Assumes catches a therapist who takes for granted what the patient never said. Help (?) explains every colour, and you can replay this practice from the home page." }
+];
+
+// Which practice a copy shows, and the codebook it uses, comes with the package (default: bill).
+const PRACTICES = {
+  bill: { codebook: "pbt", tour: TOUR_BILL, lines: BILL }
+};
+if (!PRACTICES[PACKAGE.practice || "bill"]) throw new Error(`unknown practice: ${PACKAGE.practice}`);
+const PRACTICE = { id: "Practice", ...PRACTICES[PACKAGE.practice || "bill"] };
+const TOUR = PRACTICE.tour;
+
+/* ---------------- State ---------------- */
+const STORE = `tagpai:${PACKAGE.package_id}:v1`;   // one store per package: copies for other raters never mix
+const $ = (s, root = document) => root.querySelector(s);
+const chars = s => Array.from(s);           // offsets are code points, as the importer checks them
+const motion = () => matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth";
+const saved = restore();
+let state = saved || { codebook: PACKAGE.codebook, current: 0, view: "welcome", theme: null,
+                       books: {}, batches: [], experience: null, tour: { step: 0, done: false }, practice: null,
+                       changedAt: 0, fileAt: 0, unsaved: false };
+let SESSIONS = [];
+let target = null;                          // the passage the toolbar acts on
+let mode = "tags", draft = null, msgRect = null, msgTimer = 0;
+
+function restore() { if (MEMORY) return null; try { const t = localStorage.getItem(STORE); return t ? JSON.parse(t) : null; } catch (e) { return null; } }
+function persist() { if (!MEMORY) try { localStorage.setItem(STORE, JSON.stringify(state)); } catch (e) { /* the file is the record */ } renderSaveState(); }
+function touch() { state.changedAt = Date.now(); persist(); }
+// A change to a session record (reading on, a mark added or removed, an answer, submit, reopen): the page
+// holds work that is not in a file until the next save, and loading a file asks before replacing it.
+function work() { state.unsaved = true; touch(); }
+const bump = () => touring() ? persist() : work();   // practice work is not part of the record
+const TEXT_LIMIT = 5000;   // characters in a note or a written answer, as the browser counts them; the same when loading
+// A text field that stops at the limit and says so when it is reached.
+function limitField(ta, onInput) {
+  ta.maxLength = TEXT_LIMIT; ta.spellcheck = false;   // no browser spellcheck service sees the text
+  const hint = el("div", "pick-hint limit", `That is the limit: ${TEXT_LIMIT.toLocaleString("en")} characters.`);
+  const show = () => { hint.hidden = ta.value.length < TEXT_LIMIT; };
+  ta.addEventListener("input", () => { if (ta.value.length > TEXT_LIMIT) ta.value = ta.value.slice(0, TEXT_LIMIT); show(); onInput(ta.value); });
+  show();
+  return hint;
+}
+function loadSessions() { SESSIONS = [...EMBEDDED, ...state.batches].flatMap(b => b.sessions.map(s => ({ ...s, batch: b.id }))); }
+const touring = () => state.view === "tour";
+const reading = () => state.view === "session" || touring();
+const cb = () => CODEBOOKS[touring() ? PRACTICE.codebook : state.codebook];
+const tagOf = id => cb().tags.find(t => t.id === id);
+const colorOf = id => (tagOf(id) || { color: "#858896" }).color;
+const session = () => touring() ? PRACTICE : SESSIONS[state.current];
+const progressOf = k => (state.books[state.codebook] || {})[SESSIONS[k].id];
+const blank = s => ({ shown: 1, done: false, read: s.lines.map(() => false), marks: [], answers: {}, submitted: null, reopened: [], active: 0, seq: 0 });
+function sess() {
+  const s = session();
+  if (touring()) return state.practice || (state.practice = blank(s));
+  const book = state.books[state.codebook] || (state.books[state.codebook] = {});
+  return book[s.id] || (book[s.id] = blank(s));
+}
+const rgb = hex => [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16)).join(",");
+// Time in the record: calendar dates, an order and active seconds, never a clock time.
+const today = () => { const d = new Date(), z = n => String(n).padStart(2, "0"); return `${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())}`; };
+const uid = () => "m" + [...crypto.getRandomValues(new Uint8Array(6))].map(b => b.toString(16).padStart(2, "0")).join("");   // random, no time inside
+const same = (m, t) => m.line === t.line && m.version === t.version && m.start === t.start && m.end === t.end;
+const lineText = (i, version) => { const l = session().lines[i]; return version === "raw" ? l.raw : l.text; };
+const fits = (t, where) => t.speakers.includes(where.speaker) && (where.version === "text" || t.raw);
+// The words and note of a mark, as lists show them: a long note is cut short there (it stays whole in the mark).
+const why = m => [(m.picks || []).join(", "), m.note && m.note.length > 160 ? m.note.slice(0, 158) + "…" : m.note].filter(Boolean).join("; ");
+const theme = () => state.theme || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+const plural = (n, one, many = one + "s") => `${n} ${n === 1 ? one : many}`;
+function el(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+function blendIn(node) {
+  node.classList.add("enter");
+  node.addEventListener("animationend", () => { node.classList.remove("enter"); placeCallout(); }, { once: true });
+}
+async function digest(sessions) {
+  if (!(window.crypto && crypto.subtle)) return null;
+  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(JSON.stringify(sessions)));
+  return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, "0")).join("");
+}
+
+/* ---------------- Views ---------------- */
+function applyDisplay() { document.documentElement.className = theme(); }
+function showView(v) {
+  state.view = v; persist();
+  $("#welcome").hidden = v !== "welcome"; $("#home").hidden = v !== "home"; $("#reader").hidden = !reading();
+  $("#coach").hidden = !touring();
+  document.body.classList.toggle("touring", touring());
+  if (!touring()) {       // the reader is shared with sessions: nothing may stay lifted above the header
+    $("#dim").hidden = true; document.body.classList.remove("waiting");
+    document.querySelectorAll(".lifted").forEach(e => e.classList.remove("lifted"));
+  }
+  placeCallout();
+}
+
+function experienceBoxes(host) {
+  host.replaceChildren(...EXPERIENCE.map(([key, text]) => {
+    const label = el("label", "check"), box = el("input"); box.type = "checkbox"; box.dataset.exp = key;
+    box.checked = !!(state.experience && state.experience[key]);
+    box.addEventListener("change", () => {
+      if (state.view !== "home") return;     // on the welcome page the answers are taken on Continue
+      state.experience = { ...readExperience(host), date: today() }; touch();
+    });
+    label.append(box, el("span", null, text)); return label;
+  }));
+}
+const readExperience = host => Object.fromEntries([...host.querySelectorAll("input[data-exp]")].map(b => [b.dataset.exp, b.checked]));
+
+function showWelcome() {
+  closeToolbar(); showView("welcome");
+  if (PACKAGE.intro) $("#welcome .sub").textContent = PACKAGE.intro;   // a demo copy says what it is instead
+  else if (MEMORY) $("#welcome .sub").textContent = `This copy is for rater ${PACKAGE.rater}. It works offline and makes no network requests of its own. It does not store your work in the browser: save your ratings to a file before you close the page, and send that file back. To continue later, open this page again and load your file.`;
+  else $("#w-rater").textContent = PACKAGE.rater;
+  const hosted = /^https?:$/.test(location.protocol) && typeof PACKAGE.hosting_notice === "string";
+  $("#w-hosting").hidden = !hosted; $("#w-hosting").textContent = hosted ? PACKAGE.hosting_notice : "";
+  $("#sid").textContent = "";
+  experienceBoxes($("#w-experience")); updateChrome(); window.scrollTo({ top: 0 });
+}
+function leaveWelcome(practice) {
+  state.experience = { ...readExperience($("#w-experience")), date: today() }; touch();
+  practice ? startTour() : finishTour(true);
+}
+
+function showHome() {
+  closeToolbar(); showView("home");
+  $("#sid").textContent = "";
+  renderHome(); updateChrome(); window.scrollTo({ top: 0 });
+}
+
+function renderHome() {
+  const all = [...EMBEDDED, ...state.batches];
+  $("#home-sub").textContent = !all.length ? "This copy holds the practice only."
+    : `Rater ${PACKAGE.rater}. ${plural(SESSIONS.length, "session")} in ${plural(all.length, "batch", "batches")}.`;
+  const list = $("#session-list"); list.replaceChildren();
+  all.forEach(b => {
+    const head = el("li", "batch-head"); head.append(el("b", null, `Batch ${b.id}`), el("span", null, plural(b.sessions.length, "session")));
+    list.append(head);
+    b.sessions.forEach(x => {
+      const k = SESSIONS.findIndex(s => s.id === x.id), s = SESSIONS[k], st = progressOf(k), n = s.lines.length;
+      const read = st ? st.read.filter(Boolean).length : 0;
+      const started = st && (read || st.marks.length);
+      const status = !started ? "Not started" : st.submitted ? "Submitted" : st.done ? "Questions left" : `Reply ${st.shown} of ${n}`;
+      const li = el("li"), row = el("button", "srow"); row.type = "button";
+      const bar = el("div", "mini"), fill = el("span"); fill.style.width = `${(st && st.submitted ? 1 : read / n) * 100}%`; bar.append(fill);
+      row.append(el("b", null, s.id), el("span", "st" + (st && st.submitted ? " done" : ""), status),
+                 el("span", "n", st && st.marks.length ? plural(st.marks.length, "mark") : ""), bar);
+      row.addEventListener("click", () => openSession(k));
+      li.append(row); list.append(li);
+    });
+  });
+  experienceBoxes($("#h-experience"));
+  $("#home-practice").textContent = state.tour.done ? "Replay the practice" : "Play the practice";
+  $("#codebook-row").hidden = PACKAGE.codebooks.length < 2;
+  $("#codebook").replaceChildren(...PACKAGE.codebooks.map(id => [id, CODEBOOKS[id]]).map(([id, c]) => {
+    const o = el("option", null, c.name); o.value = id; o.selected = id === state.codebook; return o;
+  }));
+}
+
+function openSession(k) {
+  closeToolbar();
+  state.current = k; showView("session");
+  renderSession();
+  const st = sess();
+  const at = st.done || st.submitted ? null : $(`.line[data-i="${st.shown - 1}"]`);
+  if (at && st.shown > 1) { const r = at.getBoundingClientRect(); window.scrollTo({ top: scrollY + r.top - innerHeight * 0.38 }); }
+  else window.scrollTo({ top: 0 });
+}
+
+/* ---------------- Practice ---------------- */
+function startTour() {
+  closeToolbar(); reread = null;
+  state.practice = null; state.tour = { ...state.tour, step: 0, acked: -1 };
+  showView("tour"); renderSession(); window.scrollTo({ top: 0 }); renderCoach();
+}
+function finishTour(skipped) {
+  if (!state.tour.done) state.tour = { ...state.tour, done: true, date: today(), skipped: !!skipped };
+  state.tour.step = 0; state.practice = null; reread = null; touch();
+  showHome();
+}
+function tourCheck() {
+  if (!touring()) return;
+  const st = sess(); let moved = false;
+  while (state.tour.step < TOUR.length - 1 && TOUR[state.tour.step].done && TOUR[state.tour.step].done(st)) { state.tour.step++; moved = true; }
+  if (moved) persist();
+  renderCoach();
+}
+function renderCoach() {
+  if (!touring()) return;
+  const viewing = reread !== null, k = viewing ? reread : state.tour.step, shown = TOUR[k], step = tourStep(), st = sess();
+  $("#coach-step").textContent = `Practice, step ${k + 1} of ${TOUR.length}${viewing ? ", read again" : ""}`;
+  $("#coach-title").textContent = shown.title || "";
+  coachText(shown.text);
+  const e = step.expect, off = !viewing && e && st.marks.find(m => m.line === e.line && m.version === (e.version || "text") && m.tag !== e.tag);
+  $("#coach-hint").textContent = off ? `That is ${tagOf(off.tag).label}; this one is ${tagOf(e.tag).label}. Click the highlight to change it.` : "";
+  // A panel alone in the light (the welcome, a panel read again) or with its reply; either way, while it
+  // explains, the conversation does not react.
+  const alone = gated() || viewing, waiting = blocked(), last = state.tour.step === TOUR.length - 1, go = $("#coach-go");
+  const label = viewing ? "Next" : state.tour.step === 0 ? step.button : gated() ? "Continue"
+              : step.info ? (step.button || "Continue") : step.pulse ? (step.button || "Next reply") : last ? step.button : "";
+  go.hidden = !label; go.textContent = label || "";
+  $("#coach-back").hidden = k === 0;
+  // The panel comes first, alone in the light; once it is handled, what it is about joins it.
+  $("#dim").hidden = false;
+  document.body.classList.toggle("waiting", waiting);
+  if (waiting) getSelection().removeAllRanges();
+  $("#coach").classList.add("lifted");
+  const focus = alone ? -1 : step.hint ? step.hint.line : st.shown - 1;
+  document.querySelectorAll(".line").forEach(a => a.classList.toggle("lifted", +a.dataset.i === focus && !st.done));
+  $("#wrap").classList.toggle("lifted", !alone && st.done);
+  $("#next").classList.toggle("pulse", !!step.pulse && !alone);
+  if (!st.done) $("#next").hidden = !(step.pulse && !alone);
+  if (renderCoach.seen !== state.tour.step) {   // a new panel: once the page has settled, make sure it is in view
+    renderCoach.seen = state.tour.step; renderCoach.pending = true;
+    clearTimeout(renderCoach.timer);
+    renderCoach.timer = setTimeout(() => {
+      renderCoach.pending = false;
+      if (!touring() || !$("#toolbar").hidden) return;
+      const r = $("#coach").getBoundingClientRect(), lit = $(".line.lifted"), over = r.bottom - innerHeight + 24;
+      const room = (lit ? lit.getBoundingClientRect().top : r.top) - 76;
+      if (over > 0 && room > 0) window.scrollBy({ top: Math.min(over, room), behavior: motion() });
+    }, 600);
+  }
+  if (step.hint !== renderCoach.hint) {        // repaint only when the glowing words move
+    renderCoach.hint = step.hint;
+    document.querySelectorAll(".line").forEach(a => paintLine(+a.dataset.i));
+  }
+  placeCallout();
+}
+// Back shows earlier panels again (to re-read); Next walks forward to where the practice is. Nothing else changes.
+function coachBack() { const k = reread === null ? state.tour.step : reread; if (k > 0) { reread = k - 1; closeToolbar(); renderCoach(); } }
+function coachForward() { reread = reread + 1 >= state.tour.step ? null : reread + 1; renderCoach(); }
+const tourStep = () => touring() ? TOUR[state.tour.step] : {};
+// Colour names in a panel look like the marks they stand for: bold, on their highlighter stroke.
+function coachText(text) {
+  const host = $("#coach-text"), tags = cb().tags, re = new RegExp(`\\b(${tags.map(t => t.label).join("|")})\\b`, "g");
+  host.replaceChildren();
+  let last = 0;
+  for (const m of text.matchAll(re)) {
+    const word = el("span", "kw", m[0]); word.style.setProperty("--rgb", rgb(tags.find(t => t.label === m[0]).color));
+    host.append(text.slice(last, m.index), word); last = m.index + m[0].length;
+  }
+  host.append(text.slice(last));
+}
+// The words a step asks for glow in the colour of the category it is about.
+const hintColor = step => rgb(colorOf(step.hint && step.hint.tag || (step.ring || ["clinical"])[0]));
+const gated = () => touring() && !!tourStep().gate && state.tour.acked !== state.tour.step;
+let reread = null;                                // an earlier panel shown again; not saved
+const blocked = () => gated() || (touring() && (reread !== null || !!tourStep().info));
+// Continue: the welcome panel starts the practice; any other panel brings its reply into the light.
+function ack() {
+  if (state.tour.step === 0) { state.tour.step++; persist(); tourCheck(); return; }
+  state.tour.acked = state.tour.step; persist(); renderCoach();
+}
+// The panel's button after Continue: the next reply, or the end of the practice.
+function coachGo() {
+  if (reread !== null) return coachForward();
+  if (gated()) return ack();
+  if (tourStep().info) { state.tour.step++; persist(); return tourCheck(); }
+  if (tourStep().pulse) return next();
+  if (state.tour.step === TOUR.length - 1) finishTour(false);
+}
+// The callout sits under the reply with the glowing words (never on its text) until the rater selects something.
+function placeCallout() {
+  const c = $("#callout"), h = tourStep().hint, spans = [...document.querySelectorAll(".hint")];
+  const rects = spans.flatMap(s => [...s.getClientRects()]), rect = rects[rects.length - 1];
+  if (!h || !rect || target || reread !== null || !$("#help").hidden) { c.hidden = true; return; }
+  const reply = spans[0].closest(".line").getBoundingClientRect();
+  c.textContent = h.callout || "Select these words";
+  c.style.setProperty("--hint", hintColor(tourStep()));
+  c.hidden = false; c.style.left = "0px"; c.style.top = "0px";
+  const w = c.offsetWidth;
+  const x = Math.max(8, Math.min(rect.left + rect.width / 2 - w / 2, document.documentElement.clientWidth - w - 8));
+  c.style.left = `${x + scrollX}px`; c.style.top = `${reply.bottom + scrollY + 8}px`;
+}
+
+/* ---------------- Reader ---------------- */
+function renderSession() {
+  const s = session(), st = sess();
+  $("#sid").textContent = touring() ? "Practice" : s.id;
+  const host = $("#dialogue"); host.replaceChildren();
+  const shown = st.submitted || st.done ? s.lines.length : st.shown;
+  for (let i = 0; i < shown; i++) { host.append(lineEl(i)); paintLine(i); }
+  $("#wrap").hidden = !(st.done || st.submitted);
+  if (!$("#wrap").hidden) renderWrap();
+  updateLines(); updateChrome();
+}
+
+// Every reply names its speaker in bold; the turn stays quieter beside it.
+function lineEl(i) {
+  const line = session().lines[i];
+  const art = el("article", `line ${line.speaker}`); art.dataset.i = i;
+  const label = el("div", "label");
+  label.append(el("b", null, line.speaker === "patient" ? "Patient" : "Therapist"), el("span", null, line.turn === 0 ? "opening" : `turn ${line.turn}`));
+  art.append(label);
+  const p = el("p", "text"); p.dataset.i = i; p.dataset.version = "text";
+  art.append(p);
+  if (line.raw != null) {
+    const box = el("div", "rawbox"), rp = el("p", "text"); rp.dataset.i = i; rp.dataset.version = "raw";
+    box.append(el("span", "raw-label", "Raw output. The underlined part never reached the other speaker; mark problems with Form."), rp);
+    art.append(box);
+  }
+  return art;
+}
+
+function updateLines() {
+  const st = sess(), active = !st.done && !st.submitted;
+  document.querySelectorAll(".line").forEach(a => a.classList.toggle("past", active && +a.dataset.i < st.shown - 1));
+}
+
+function updateChrome() {
+  const st = reading() ? sess() : null, n = st ? session().lines.length : 1;
+  const hide = !st || st.done || st.submitted;
+  $("#next").hidden = hide; $("#fade").hidden = hide;
+  $("#bar").style.width = !st ? "0" : `${(st.submitted ? 1 : st.read.filter(Boolean).length / n) * 100}%`;
+}
+
+function next() {
+  if (!reading() || (touring() && (blocked() || !tourStep().pulse))) return;   // the practice moves on only when a step says so
+  const s = session(), st = sess();
+  if (st.done || st.submitted) return;
+  closeToolbar();
+  st.read[st.shown - 1] = true;
+  if (st.shown < s.lines.length) {
+    st.shown++;
+    const a = lineEl(st.shown - 1); blendIn(a); $("#dialogue").append(a); paintLine(st.shown - 1);
+    updateLines(); bring(a, touring() ? 0.24 : 0.36);   // in the practice, leave room for the panel below
+  } else {
+    st.done = true; updateLines();
+    const w = $("#wrap"); w.hidden = false; renderWrap(); blendIn(w); bring(touring() ? $("#coach") : w, 0.12);
+  }
+  bump(); updateChrome(); tourCheck();
+}
+function bring(node, at) { const r = node.getBoundingClientRect(); window.scrollTo({ top: scrollY + r.top - innerHeight * at, behavior: motion() }); }
+function scrollToLine(i) { const a = $(`.line[data-i="${i}"]`); if (a) bring(a, 0.3); }
+
+// Word-level difference: the stretches of the raw output that the cleaned text does not contain.
+function removedRanges(raw, clean) {
+  const words = s => { const cs = chars(s), out = []; let k = 0;
+    while (k < cs.length) { const ws = /\s/.test(cs[k]); let j = k + 1; while (j < cs.length && /\s/.test(cs[j]) === ws) j++;
+      if (!ws) out.push({ t: cs.slice(k, j).join(""), s: k, e: j }); k = j; }
+    return out; };
+  const a = words(raw), b = words(clean).map(w => w.t), n = a.length, m = b.length;
+  const L = Array.from({ length: n + 1 }, () => new Uint16Array(m + 1));
+  for (let i = n - 1; i >= 0; i--) for (let j = m - 1; j >= 0; j--) L[i][j] = a[i].t === b[j] ? L[i + 1][j + 1] + 1 : Math.max(L[i + 1][j], L[i][j + 1]);
+  const keep = new Array(n).fill(false);
+  for (let i = 0, j = 0; i < n && j < m;) { if (a[i].t === b[j]) { keep[i] = true; i++; j++; } else if (L[i + 1][j] >= L[i][j + 1]) i++; else j++; }
+  const out = [];
+  a.forEach((w, i) => { if (keep[i]) return; if (i > 0 && !keep[i - 1] && out.length) out[out.length - 1].e = w.e; else out.push({ s: w.s, e: w.e }); });
+  return out;
+}
+
+// Split a reply into segments at every boundary (marks, removed raw text, the selection, the practice hint).
+function paintLine(i) {
+  const st = sess(), line = session().lines[i], h = tourStep().hint, glow = h && hintColor(tourStep());
+  document.querySelectorAll(`.text[data-i="${i}"]`).forEach(p => {
+    const version = p.dataset.version, text = lineText(i, version), cs = chars(text);
+    const marks = st.marks.filter(m => m.line === i && m.version === version);
+    const removed = version === "raw" ? removedRanges(line.raw, line.text) : [];
+    const t = target && target.line === i && target.version === version ? target : null;
+    let hint = null;
+    if (h && h.line === i && (h.version || "text") === version && text.includes(h.phrase)) {
+      const s = chars(text.slice(0, text.indexOf(h.phrase))).length;
+      hint = { s, e: s + chars(h.phrase).length };
+    }
+    const cuts = new Set([0, cs.length]);
+    marks.forEach(m => { cuts.add(m.start); cuts.add(m.end); });
+    removed.forEach(r => { cuts.add(r.s); cuts.add(r.e); });
+    if (t) { cuts.add(t.start); cuts.add(t.end); }
+    if (hint) { cuts.add(hint.s); cuts.add(hint.e); }
+    const pts = [...cuts].sort((a, b) => a - b);
+    p.replaceChildren();
+    for (let k = 0; k < pts.length - 1; k++) {
+      const a = pts[k], b = pts[k + 1], seg = cs.slice(a, b).join("");
+      const cover = marks.filter(m => m.start <= a && m.end >= b);
+      const inTarget = t && a >= t.start && b <= t.end;
+      const gone = removed.some(r => r.s <= a && r.e >= b);
+      const hinted = hint && a >= hint.s && b <= hint.e;
+      if (!cover.length && !inTarget && !gone && !hinted) { p.append(document.createTextNode(seg)); continue; }
+      const span = el("span", null, seg);
+      if (gone) span.classList.add("removed");
+      if (hinted) { span.classList.add("hint"); span.style.setProperty("--hint", glow); }
+      if (cover.length) {
+        span.classList.add("hl"); span.dataset.marks = cover.map(m => m.id).join(" ");
+        span.style.setProperty("--rgb", rgb(colorOf(cover[cover.length - 1].tag)));
+        if (cover.length > 1) { span.classList.add("multi"); span.style.setProperty("--rgb2", rgb(colorOf(cover[cover.length - 2].tag))); }
+      }
+      if (inTarget) span.classList.add("current");
+      p.append(span);
+    }
+  });
+}
+
+/* ---------------- Wrap-up ---------------- */
+function renderWrap() {
+  const s = session(), st = sess(), wrap = $("#wrap"), locked = !!st.submitted;
+  wrap.replaceChildren(el("h2", null, locked ? "Submitted" : "Before you submit"));
+
+  wrap.append(el("h3", null, "Your marks"));
+  const grid = el("div", "marks");
+  const order = (a, b) => a.line - b.line || a.start - b.start;
+  cb().tags.forEach(t => {
+    const list = st.marks.filter(m => m.tag === t.id).sort(order);
+    const tag = el("div", "mtag"); tag.style.setProperty("--rgb", rgb(t.color));
+    tag.append(el("span", "dot"), t.label);
+    const cell = el("div", "mlist");
+    if (!list.length) cell.append(el("span", "none", "Not marked"));
+    list.forEach(m => {
+      const b = el("button", "mitem"); b.type = "button"; b.style.setProperty("--rgb", rgb(t.color));
+      const quote = el("q", null, m.quote.length > 70 ? m.quote.slice(0, 68) + "…" : m.quote);
+      const where = `Turn ${s.lines[m.line].turn}${m.version === "raw" ? ", raw output" : ""}`;
+      b.append(quote, el("small", null, why(m) ? `${where}: ${why(m)}` : where));
+      b.addEventListener("click", () => jumpTo(m));
+      cell.append(b);
+    });
+    grid.append(tag, cell);
+  });
+  wrap.append(grid);
+
+  wrap.append(el("h3", null, "Questions"));
+  cb().questions.forEach(q => {
+    const box = el("div", "q"), label = el("div", "q-text", q.text);
+    if (q.optional) label.append(el("span", "opt", "Optional"));
+    box.append(label);
+    if (q.type === "text") {
+      const ta = document.createElement("textarea"); ta.value = st.answers[q.id] || ""; ta.disabled = locked;
+      ta.setAttribute("aria-label", q.text);
+      box.append(ta, limitField(ta, v => { st.answers[q.id] = v; bump(); updateSubmit(); }));
+    } else {
+      // A scale is stored as its position (0, 1, 2) and shown only as words, in order.
+      const seg = el("div", "seg"); seg.setAttribute("role", "group"); seg.setAttribute("aria-label", q.text);
+      const opts = q.type === "scale" ? q.labels.map((l, k) => ({ value: k, label: l })) : q.options.map((o, k) => ({ value: q.values[k], label: o }));
+      opts.forEach(o => {
+        const b = el("button", null, o.label); b.type = "button"; b.disabled = locked;
+        b.setAttribute("aria-pressed", String(st.answers[q.id] === o.value));
+        b.addEventListener("click", () => { st.answers[q.id] = o.value; bump(); renderWrap(); });
+        seg.append(b);
+      });
+      box.append(seg);
+    }
+    wrap.append(box);
+  });
+  if (touring()) return;                        // the practice ends on its card, not on Submit
+
+  const row = el("div", "submit-row");
+  if (locked) {
+    row.append(el("span", "submitted", `Submitted on ${st.submitted}.`));
+    const re = el("button", "btn", "Reopen"); re.type = "button"; re.addEventListener("click", reopen);
+    const home = el("button", "btn", "All sessions"); home.type = "button"; home.addEventListener("click", showHome);
+    row.append(re, home);
+    if (state.current < SESSIONS.length - 1) {
+      const nx = el("button", "btn primary", "Next session"); nx.type = "button";
+      nx.addEventListener("click", () => openSession(state.current + 1)); row.append(nx);
+    }
+  } else {
+    const b = el("button", "btn primary", "Submit session"); b.type = "button"; b.id = "submit";
+    b.addEventListener("click", submit);
+    row.append(b, el("span", "why"));
+  }
+  wrap.append(row);
+  updateSubmit();
+}
+
+function missing() {
+  const st = sess();
+  const open = cb().questions.filter(q => !q.optional && (st.answers[q.id] === undefined || st.answers[q.id] === "")).length;
+  return open ? [`${plural(open, "question")} to answer`] : [];
+}
+function updateSubmit() {
+  const b = $("#submit"); if (!b) return;
+  const m = missing(); b.disabled = m.length > 0;
+  $(".submit-row .why").textContent = m.join(", ");
+}
+function renderSaveState() {
+  const b = $("#save"), dirty = state.changedAt > state.fileAt;
+  b.classList.toggle("dirty", dirty);
+  b.title = !state.changedAt ? "Save to file (Ctrl+S)"
+    : dirty ? (MEMORY ? "Not yet in a file (Ctrl+S)" : "Kept in this browser, not yet in a file (Ctrl+S)")
+    : `Saved to file at ${new Date(state.fileAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`;
+}
+function renderLegend() {
+  $("#legend").replaceChildren(...cb().tags.flatMap(t => {
+    const tag = el("div", "mtag"); tag.style.setProperty("--rgb", rgb(t.color));
+    tag.append(el("span", "dot"), t.label);
+    const who = t.speakers.length > 1 ? "Either speaker" : t.speakers[0] === "patient" ? "Patient" : "Therapist";
+    const extra = [t.raw ? "also in the raw output" : "", t.noteRequired ? "note required" : ""].filter(Boolean);
+    const d = el("div", null, t.help);
+    d.prepend(el("div", "who", extra.length ? `${who}, ${extra.join(", ")}` : who));
+    const listed = t.legend && t.picks.find(g => g.group === t.legend);
+    if (listed) { const areas = el("div", "areas"); areas.append(...listed.items.map(a => el("span", null, a))); d.append(areas); }
+    return [tag, d];
+  }));
+}
+
+/* ---------------- Marking ---------------- */
+const WORD = /[\p{L}\p{N}'’-]/u;
+function snap(cs, s, e) {
+  while (s < e && /\s/.test(cs[s])) s++;
+  while (e > s && /\s/.test(cs[e - 1])) e--;
+  while (s > 0 && s < cs.length && WORD.test(cs[s - 1]) && WORD.test(cs[s])) s--;
+  while (e < cs.length && e > 0 && WORD.test(cs[e]) && WORD.test(cs[e - 1])) e++;
+  return [s, e];
+}
+const nodeEl = n => n.nodeType === 1 ? n : n.parentElement;
+function cpAt(p, node, off) {
+  const r = document.createRange(); r.selectNodeContents(p);
+  try { r.setEnd(node, off); } catch (e) { return 0; }
+  return chars(r.toString()).length;
+}
+function spills(range, p) {
+  for (const q of document.querySelectorAll(".text")) {
+    if (q === p || !range.intersectsNode(q)) continue;
+    const r = document.createRange(); r.selectNodeContents(q);
+    if (range.compareBoundaryPoints(Range.START_TO_START, r) > 0) r.setStart(range.startContainer, range.startOffset);
+    if (range.compareBoundaryPoints(Range.END_TO_END, r) < 0) r.setEnd(range.endContainer, range.endOffset);
+    if (r.toString().trim()) return true;
+  }
+  return false;
+}
+
+function onSelect(ev) {
+  const sel = getSelection();
+  if (!sel.rangeCount || sel.isCollapsed) {
+    const hl = ev && ev.target.closest && ev.target.closest(".hl");
+    if (hl && !sess().submitted) openForMark(hl); else closeToolbar();
+    return;
+  }
+  const range = sel.getRangeAt(0);
+  const p = nodeEl(range.startContainer).closest(".text");
+  if (!p) return;
+  if (sess().submitted) return showMessage(range, "This session is submitted. Reopen it to change marks.");
+  const cs = chars(lineText(+p.dataset.i, p.dataset.version));
+  let end;
+  if (p.contains(range.endContainer)) end = cpAt(p, range.endContainer, range.endOffset);
+  else {
+    // A triple-click runs on past the reply (into labels); only text of another reply refuses it.
+    if (spills(range, p)) return showMessage(range, "Mark within one reply.");
+    end = cs.length;
+  }
+  const [s, e] = snap(cs, cpAt(p, range.startContainer, range.startOffset), end);
+  if (e <= s) return closeToolbar();
+  const i = +p.dataset.i, line = session().lines[i];
+  sel.removeAllRanges();
+  setTarget({ line: i, version: p.dataset.version, start: s, end: e, quote: cs.slice(s, e).join(""), speaker: line.speaker });
+}
+
+function setTarget(t) {
+  const old = target; target = t; mode = "tags"; draft = null;
+  if (old && old.line !== t.line) paintLine(old.line);
+  paintLine(t.line); renderToolbar();
+}
+function openForMark(hl) {
+  const ids = hl.dataset.marks.split(" ");
+  const m = sess().marks.filter(x => ids.includes(x.id)).sort((a, b) => (a.end - a.start) - (b.end - b.start))[0];
+  if (m) setTarget({ line: m.line, version: m.version, start: m.start, end: m.end, quote: m.quote, speaker: session().lines[m.line].speaker });
+}
+function jumpTo(m) {
+  scrollToLine(m.line);
+  if (!sess().submitted) setTarget({ line: m.line, version: m.version, start: m.start, end: m.end, quote: m.quote, speaker: session().lines[m.line].speaker });
+}
+
+function chip(label, key, color, on, hint) {
+  const b = el("button", "chip" + (on ? " on" : "")); b.type = "button";
+  b.style.setProperty("--rgb", rgb(color || "#858896"));
+  if (color) b.append(el("span", "dot"));
+  b.append(label);
+  if (key != null) b.append(el("span", "key", String(key)));
+  if (hint) b.title = hint;
+  b.setAttribute("aria-pressed", String(!!on));
+  return b;
+}
+const keepFocus = b => b.addEventListener("mousedown", e => e.preventDefault());
+
+function renderToolbar() {
+  tourCheck();                                  // a step may complete on this very action; ring what the next one needs
+  if (blocked()) return closeToolbar();         // the panel comes first
+  const tb = $("#toolbar"); tb.replaceChildren(); tb.hidden = false;
+  placeCallout();
+  if (mode === "message") { tb.append(el("div", "tb-msg", tb.dataset.msg)); place(); return; }
+  const here = sess().marks.filter(m => same(m, target)), step = tourStep();
+  if (mode === "tags") {
+    const row = el("div", "tb-row");
+    cb().tags.forEach((t, k) => {
+      if (!fits(t, target)) return;
+      const m = here.find(x => x.tag === t.id);
+      const b = chip(t.label, k + 1, t.color, !!m, t.help);
+      if ((step.ring || []).includes(t.id)) b.classList.add("coach-target");
+      b.addEventListener("click", () => openNote(t));
+      row.append(b);
+    });
+    tb.append(row);
+    if (here.length) {
+      const list = el("div", "tb-marks");
+      here.forEach(m => {
+        const r = el("div", "tb-mark"); r.style.setProperty("--rgb", rgb(colorOf(m.tag)));
+        r.append(el("span", "dot"), why(m) || tagOf(m.tag).label);
+        list.append(r);
+      });
+      tb.append(list);
+    }
+    place(); return;
+  }
+  // mode === "note": the colour's suggested words, a free note, save.
+  const t = draft.tag, box = el("div", "tb-note");
+  box.style.setProperty("--rgb", rgb(t.color));
+  const head = el("div", "tb-head"); head.append(el("span", "dot"), t.label, el("small", null, draft.mark ? "editing" : ""));
+  box.append(head);
+  const save = el("button", "btn primary", "Save"); save.type = "button";
+  const blocks = [], buttons = [], prompts = [];
+  const has = items => draft.picks.some(x => items.includes(x));
+  const ready = () => {
+    save.disabled = t.noteRequired && !draft.picks.length && !draft.note.trim();
+    // An aspect without its area, or an area without how it is known, gets a nudge, not a block.
+    prompts.forEach(([g, p]) => { p.hidden = has(g.items) || !has(g.ask ? g.needs : g.nudge.when); });
+    blocks.forEach(([g, block]) => { if (g.needs) block.hidden = !has(g.needs); });
+    buttons.forEach(([b, item]) => b.setAttribute("aria-pressed", String(draft.picks.includes(item))));
+  };
+  (t.picks || []).forEach(g => {
+    const block = el("div", "pick-block" + (g.needs ? " dependent" : "")); block.append(el("div", "pick-group", g.group));
+    const picks = el("div", "picks");
+    g.items.forEach(item => {
+      const b = el("button", "pick", item); b.type = "button"; keepFocus(b);
+      if (g.tips && g.tips[item]) b.title = g.tips[item];
+      if ((step.ringPicks || []).includes(item)) b.classList.add("coach-target");
+      b.addEventListener("click", () => {
+        const on = draft.picks.includes(item);
+        let picked = draft.picks.filter(x => x !== item && !(g.single && g.items.includes(x)));   // one per single-choice group
+        if (!on) picked.push(item);
+        t.picks.forEach(d => { if (d.needs && !picked.some(x => d.needs.includes(x))) picked = picked.filter(x => !d.items.includes(x)); });   // no area, no basis
+        draft.picks = picked; ready();
+      });
+      buttons.push([b, item]); picks.append(b);
+    });
+    block.append(picks); box.append(block); blocks.push([g, block]);
+    if (g.nudge) { const p = el("div", "pick-hint", g.nudge.text); box.append(p); prompts.push([g, p]); }
+    if (g.ask) { const p = el("div", "pick-hint", g.ask); block.append(p); prompts.push([g, p]); }
+  });
+  const ta = document.createElement("textarea");
+  ta.placeholder = t.noteRequired ? "Why? A few words, or pick above" : "Why? (optional)";
+  ta.value = draft.note; ta.setAttribute("aria-label", "Note");
+  const limit = limitField(ta, v => { draft.note = v; ready(); });
+  ta.addEventListener("keydown", e => {
+    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); if (!save.disabled) saveDraft(); }
+    else if (e.key === "Escape") { e.preventDefault(); back(); }
+  });
+  box.append(ta, limit);
+  const actions = el("div", "tb-actions");
+  actions.append(el("span", "keys-hint", "Enter to save, Esc to change colour"));
+  if (draft.mark) { const r = el("button", "btn quiet danger", "Remove"); r.type = "button"; r.addEventListener("click", () => removeMark(draft.mark)); actions.append(r); }
+  const cancel = el("button", "btn quiet", "Change colour"); cancel.type = "button"; cancel.addEventListener("click", back);
+  save.addEventListener("click", saveDraft);
+  actions.append(cancel, save); box.append(actions);
+  tb.append(box); ready();
+  place(); ta.focus({ preventScroll: true });   // place() decides the scroll
+}
+
+// The toolbar opens under the whole reply, so the text being marked stays readable (in the practice,
+// under the panel, so the instruction stays readable too), and the page scrolls just enough to show it.
+function place() {
+  const tb = $("#toolbar");
+  let rects = [];
+  if (mode === "message" && msgRect) rects = [msgRect];
+  else document.querySelectorAll(".current").forEach(s => rects.push(...s.getClientRects()));
+  if (!rects.length) return;
+  const first = rects[0], row = rects.filter(r => Math.abs(r.top - first.top) < 3);
+  const left = Math.min(...row.map(r => r.left)), right = Math.max(...row.map(r => r.right));
+  const reply = target && $(`.line[data-i="${target.line}"]`);
+  const above = touring() && !$("#coach").hidden ? $("#coach") : reply;
+  const y = (above ? above.getBoundingClientRect().bottom : Math.max(...rects.map(r => r.bottom))) + 12;
+  tb.style.left = "0px"; tb.style.top = "0px";   // measure at full width, not squeezed at the edge
+  const w = tb.offsetWidth, h = tb.offsetHeight;
+  const x = Math.max(8, Math.min((left + right) / 2 - w / 2, document.documentElement.clientWidth - w - 8));
+  tb.style.left = `${x + scrollX}px`; tb.style.top = `${y + scrollY}px`;
+  const over = y + h + 16 - innerHeight, room = (reply ? reply.getBoundingClientRect().top : first.top) - 76;
+  if (over > 0 && room > 0) window.scrollBy({ top: Math.min(over, room), behavior: motion() });   // never under the header
+}
+
+function showMessage(range, text) {
+  closeToolbar();
+  msgRect = range.getBoundingClientRect(); mode = "message";
+  const tb = $("#toolbar"); tb.dataset.msg = text; renderToolbar();
+  clearTimeout(msgTimer); msgTimer = setTimeout(() => { if (mode === "message") closeToolbar(); }, 1800);
+}
+function closeToolbar() {
+  const old = target; target = null; mode = "tags"; draft = null; msgRect = null;
+  $("#toolbar").hidden = true;
+  if (old && reading()) paintLine(old.line);
+  placeCallout();
+}
+function back() { mode = "tags"; draft = null; renderToolbar(); }
+
+// Picking a colour opens its note; an existing mark of that colour opens for editing.
+function openNote(t) {
+  const m = sess().marks.find(x => same(x, target) && x.tag === t.id);
+  draft = { tag: t, mark: m || null, picks: m ? [...(m.picks || [])] : [], note: m ? m.note || "" : "" };
+  mode = "note"; renderToolbar();
+}
+function saveDraft() {
+  const st = sess(), t = draft.tag;
+  if (t.noteRequired && !draft.picks.length && !draft.note.trim()) return;
+  draft.note = draft.note.slice(0, TEXT_LIMIT);   // the field stops there already; a saved file must load again
+  const picks = (t.picks || []).flatMap(g => g.items).filter(x => draft.picks.includes(x));   // codebook order, not click order
+  if (draft.mark) { draft.mark.picks = picks; draft.mark.note = draft.note.trim(); }
+  else st.marks.push({ id: uid(), line: target.line, version: target.version, start: target.start, end: target.end,
+                       quote: target.quote, tag: t.id, picks, note: draft.note.trim(), seq: st.seq = (st.seq || 0) + 1, t: st.active || 0 });
+  changed();
+}
+function removeMark(m) { const st = sess(); st.marks = st.marks.filter(x => x !== m); changed(); }
+function changed() {
+  mode = "tags"; draft = null; bump();
+  paintLine(target.line); renderToolbar(); if (!$("#wrap").hidden) renderWrap();
+}
+
+/* ---------------- Submit, save, load, batches ---------------- */
+function submit() {
+  if (missing().length) return;
+  closeToolbar();
+  sess().submitted = today(); work();
+  updateLines(); renderWrap(); updateChrome();
+}
+function reopen() {
+  const reason = prompt("Why reopen this session? The earlier submission is kept.");
+  if (!reason || !reason.trim()) return;
+  const st = sess();
+  st.reopened.push({ date: today(), t: st.active || 0, reason: reason.trim(), submitted: st.submitted,
+                     snapshot: JSON.parse(JSON.stringify({ marks: st.marks, answers: st.answers })) });
+  st.submitted = null; work(); renderWrap(); updateChrome();
+}
+async function saveFile() {
+  if (DEMO) return;
+  const batches = [], saveNo = state.saves = (state.saves || 0) + 1;
+  for (const b of EMBEDDED) batches.push({ id: b.id, sha256: await digest(b.sessions), source: "built in" });
+  for (const b of state.batches) batches.push({ id: b.id, sha256: b.sha256, source: "file", added: b.added });
+  const out = { format: "dialogue-annotations", schema: 1, app: { name: APP.name, version: APP.version },
+                study: PACKAGE.study, rater: PACKAGE.rater, package_id: PACKAGE.package_id,
+                experience: state.experience, practice: { done: !!state.tour.done, date: state.tour.date || null, skipped: !!state.tour.skipped },
+                batches, codebook: state.codebook, codebook_spec: cb(), saved_on: today(), save_no: saveNo,
+                sessions: state.books[state.codebook] || {} };
+  const blob = new Blob([JSON.stringify(out, null, 1)], { type: "application/json" });
+  const a = el("a"); a.href = URL.createObjectURL(blob);
+  a.download = `ratings_${PACKAGE.rater}_${today()}_${String(saveNo).padStart(2, "0")}.json`;   // date and save number, no clock time
+  document.body.append(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  state.fileAt = Date.now(); if (!state.changedAt) state.changedAt = state.fileAt; state.unsaved = false; persist();
+}
+// Files are checked whole before anything on this page changes; one problem refuses the file.
+const LIMIT = 20e6;                                   // bytes; far above any real batch or ratings file
+const ID = /^[A-Za-z0-9_.-]{1,40}$/;                  // batch and session names
+// Names are keys of plain objects (a session's record is looked up by its name), so none may be a name
+// every object inherits ("constructor", "__proto__", "toString" and the like).
+const nameOk = x => typeof x === "string" && ID.test(x) && !(x in Object.prototype);
+const isInt = (x, min = 0, max = Infinity) => Number.isInteger(x) && x >= min && x <= max;
+const isObj = x => x !== null && typeof x === "object" && !Array.isArray(x);
+const isDate = x => typeof x === "string" && /^\d{4}-\d{2}-\d{2}$/.test(x);
+const linesOk = lines => Array.isArray(lines) && lines.length > 0 && lines.every(l => isObj(l) && isInt(l.turn)
+  && (l.speaker === "therapist" || l.speaker === "patient") && typeof l.text === "string" && (l.raw == null || typeof l.raw === "string"));
+// True if a batch's sessions are missing or malformed, or a name repeats (within them or among `taken`).
+function sessionsProblem(sessions, taken) {
+  if (!Array.isArray(sessions) || !sessions.length) return true;
+  const seen = new Set(taken);
+  for (const x of sessions) {
+    if (!isObj(x) || !nameOk(x.id) || seen.has(x.id) || !linesOk(x.lines)) return true;
+    seen.add(x.id);
+  }
+  return false;
+}
+async function addBatch(file) {
+  if (file.size > LIMIT) return alert("That file is too large to be a batch of sessions. Nothing was added.");
+  let data;
+  try { data = JSON.parse(await file.text()); } catch (e) { return alert("That file is not a batch of sessions."); }
+  if (!isObj(data) || data.format !== "dialogue-batch" || !nameOk(data.batch)) return alert("That file is not a batch of sessions.");
+  if (data.study !== PACKAGE.study || data.rater !== PACKAGE.rater)
+    return alert(`This batch is for rater ${String(data.rater).slice(0, 40)}, not for this copy (rater ${PACKAGE.rater}). Nothing was added.`);
+  if ([...EMBEDDED, ...state.batches].some(b => b.id === data.batch)) return alert(`Batch ${data.batch} is already here.`);
+  if (sessionsProblem(data.sessions, SESSIONS.map(x => x.id)))
+    return alert("This batch does not fit this copy: its sessions are missing or malformed, or a session name repeats, within the batch or with one already here. Nothing was added.");
+  const sum = await digest(data.sessions);
+  if (!sum) return alert("This browser cannot check the batch file's checksum, so it was not added.");
+  if (sum !== data.sha256) return alert("This batch file is damaged: its content does not match its checksum. Nothing was added.");
+  state.batches.push({ id: data.batch, sessions: data.sessions, sha256: data.sha256, added: today() });
+  loadSessions(); touch(); renderHome();
+}
+
+// What is wrong with one saved mark, or null. `ids` and `seqs` collect what the list's marks have used.
+function markProblem(m, s, book, ids, seqs, seq) {
+  if (!isObj(m)) return "not a mark";
+  if (typeof m.id !== "string" || !/^m[0-9a-f]{12}$/.test(m.id) || ids.has(m.id)) return "id";
+  ids.add(m.id);
+  const l = isInt(m.line) ? s.lines[m.line] : null;
+  if (!l) return "line";
+  if (m.version !== "text" && !(m.version === "raw" && typeof l.raw === "string")) return "version";
+  const text = chars(m.version === "raw" ? l.raw : l.text);
+  if (!isInt(m.start) || !isInt(m.end, m.start + 1, text.length)) return "offsets";
+  if (typeof m.quote !== "string" || text.slice(m.start, m.end).join("") !== m.quote) return "quote";
+  const t = book.tags.find(x => x.id === m.tag);
+  if (!t || !fits(t, { speaker: l.speaker, version: m.version })) return "tag";
+  const groups = t.picks || [], has = items => m.picks.some(x => items.includes(x));
+  // Known words, each once, in codebook order; one from a single-choice group; a dependent group only with what it needs.
+  if (!Array.isArray(m.picks) || JSON.stringify(groups.flatMap(g => g.items).filter(x => m.picks.includes(x))) !== JSON.stringify(m.picks)
+      || groups.some(g => (g.single && m.picks.filter(x => g.items.includes(x)).length > 1) || (g.needs && has(g.items) && !has(g.needs)))) return "picks";
+  if (typeof m.note !== "string" || m.note.length > TEXT_LIMIT) return "note";
+  if (t.noteRequired && !m.picks.length && !m.note.trim()) return "no pick or note";
+  if (!isInt(m.seq, 1, seq) || seqs.has(m.seq)) return "order";
+  seqs.add(m.seq);
+  return isInt(m.t) ? null : "time";
+}
+const answersOk = (book, a) => isObj(a) && Object.entries(a).every(([k, v]) => {
+  const q = book.questions.find(x => x.id === k);
+  return q && (q.type === "text" ? typeof v === "string" && v.length <= TEXT_LIMIT : q.type === "scale" ? isInt(v, 0, q.labels.length - 1) : q.values.includes(v));
+});
+const marksOk = (marks, s, book, seq) => { const ids = new Set(), seqs = new Set(); return Array.isArray(marks) && marks.every(m => !markProblem(m, s, book, ids, seqs, seq)); };
+// What is wrong with one saved session record, as a list of short labels.
+function sessionProblems(sid, st, s, book) {
+  if (!isObj(st)) return [`${sid}: not a session`];
+  const n = s.lines.length, bad = [], is = (ok, what) => { if (!ok) bad.push(`${sid}: ${what}`); };
+  is(isInt(st.shown, 1, n), "shown");
+  is(typeof st.done === "boolean", "done");
+  is(Array.isArray(st.read) && st.read.length === n && st.read.every(r => typeof r === "boolean"), "read");
+  is(st.submitted === null || (isDate(st.submitted) && st.done === true), "submitted");
+  is(isInt(st.active) && isInt(st.seq), "time and order");
+  is(answersOk(book, st.answers), "answers");
+  if (!Array.isArray(st.marks)) bad.push(`${sid}: marks`);
+  else {
+    const ids = new Set(), seqs = new Set();
+    st.marks.forEach(m => { const p = markProblem(m, s, book, ids, seqs, st.seq); if (p) bad.push(`${sid} mark ${isObj(m) && typeof m.id === "string" ? m.id.slice(0, 16) : "?"}: ${p}`); });
+  }
+  is(Array.isArray(st.reopened) && st.reopened.every(r => isObj(r) && isDate(r.date) && isInt(r.t) && typeof r.reason === "string"
+     && isDate(r.submitted) && isObj(r.snapshot) && answersOk(book, r.snapshot.answers) && marksOk(r.snapshot.marks, s, book, st.seq)), "reopened");
+  return bad;
+}
+// Why a ratings file cannot be loaded here, or null.
+async function ratingsProblem(data) {
+  const foreign = "That file is not a saved ratings file for this page.";
+  if (!isObj(data) || data.format !== "dialogue-annotations" || data.schema !== 1 || !PACKAGE.codebooks.includes(data.codebook)) return foreign;
+  if (data.rater !== PACKAGE.rater) return `That file belongs to rater ${String(data.rater).slice(0, 40)}, not to this copy.`;
+  if (data.study !== PACKAGE.study || data.package_id !== PACKAGE.package_id) return "That file belongs to another study or copy, not to this one.";
+  if (!isObj(data.sessions)) return foreign;
+  // The file must list the batches its sessions come from, each with its checksum, and they must be the
+  // ones here, unchanged. A check against damage and mix-ups, not proof of who sent the file.
+  const listed = data.batches;
+  if (!Array.isArray(listed) || listed.some(b => !isObj(b) || !nameOk(b.id) || !/^[0-9a-f]{64}$/.test(b.sha256 || "")))
+    return "That file does not list its batches with checksums.";
+  const have = new Set([...EMBEDDED, ...state.batches].map(b => b.id));
+  const need = listed.map(b => b.id).filter(id => !have.has(id));
+  if (need.length) return `This file also covers batch ${need.join(", ")}. Add that batch file first (Home, Add a batch), then load this file again.`;
+  const known = new Map(state.batches.map(b => [b.id, b.sha256]));
+  for (const b of EMBEDDED) known.set(b.id, await digest(b.sessions));
+  if (listed.some(b => !known.get(b.id))) return "This browser cannot check the batches' checksums, so the file was not loaded.";
+  const differ = listed.filter(b => b.sha256 !== known.get(b.id)).map(b => b.id);
+  if (differ.length) return `That file was made with a different version of batch ${differ.join(", ")}.`;
+  const from = new Set(listed.map(b => b.id));
+  const outside = Object.keys(data.sessions).filter(sid => { const s = SESSIONS.find(x => x.id === sid); return s && !from.has(s.batch); });
+  if (outside.length) return `That file has sessions from batches it does not list (${outside.slice(0, 3).join(", ")}).`;
+  const exp = data.experience, p = data.practice;
+  if (!(exp === null || (isObj(exp) && Object.entries(exp).every(([k, v]) => k === "date" ? isDate(v) : EXPERIENCE.some(([key]) => key === k) && typeof v === "boolean")))
+      || !isObj(p) || typeof p.done !== "boolean" || typeof p.skipped !== "boolean" || !(p.date === null || isDate(p.date)) || !isInt(data.save_no, 1)) return foreign;
+  const book = CODEBOOKS[data.codebook], bad = [];
+  for (const [sid, st] of Object.entries(data.sessions)) {
+    const s = SESSIONS.find(x => x.id === sid);
+    if (!s) bad.push(sid); else bad.push(...sessionProblems(sid, st, s, book));
+  }
+  return bad.length ? `The file does not match these sessions: ${bad.slice(0, 5).join(", ")}.` : null;
+}
+function loadFile(file) {
+  if (file.size > LIMIT) return alert("That file is too large to be a saved ratings file. Nothing was loaded.");
+  const reader = new FileReader();
+  reader.onload = async () => {
+    let data;
+    try { data = JSON.parse(reader.result); } catch (e) { return alert("That file is not a saved ratings file. Nothing was loaded."); }
+    const problem = await ratingsProblem(data);
+    if (problem) return alert(`${problem} Nothing was loaded.`);
+    if (state.unsaved && !confirm("Loading this file replaces the ratings on this page, and some of them are not saved in a file yet. Load it anyway?")) return;
+    state.books[data.codebook] = data.sessions; state.codebook = data.codebook;
+    if (data.experience) state.experience = data.experience;
+    if (data.practice.done) state.tour = { ...state.tour, done: true, date: data.practice.date, skipped: data.practice.skipped };
+    state.saves = Math.max(state.saves || 0, data.save_no);   // the next save gets the next number
+    state.changedAt = state.fileAt = Date.now(); state.unsaved = false; persist(); showHome();
+  };
+  reader.readAsText(file);
+}
+
+/* ---------------- Events ---------------- */
+// A mouse-clicked button gives focus back, so Space keeps meaning "next reply".
+document.addEventListener("click", e => { const b = e.target.closest && e.target.closest("button"); if (b && e.detail > 0) setTimeout(() => b.blur(), 0); }, true);
+// After a double-click, wait briefly: a third click selects the whole reply.
+let pending = 0;
+document.addEventListener("mousedown", () => clearTimeout(pending));
+document.addEventListener("mouseup", e => {
+  if (!reading() || blocked() || e.target.closest("#toolbar, .topbar, .overlay, .wrap, .coach, button")) return;
+  clearTimeout(pending);
+  pending = setTimeout(() => onSelect(e), e.detail === 2 ? 300 : 0);
+});
+document.addEventListener("keydown", e => {
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") { e.preventDefault(); saveFile(); return; }
+  if (e.target.closest && e.target.closest("textarea, input, select")) return;
+  if (!$("#help").hidden) { if (e.key === "Escape") hideHelp(); return; }
+  if (touring() && reread !== null) {
+    if (e.key === " " || e.key === "Enter" || e.key === "ArrowDown") { e.preventDefault(); coachForward(); }
+    else if (e.key === "Escape") { reread = null; renderCoach(); }
+    return;
+  }
+  if (gated() || (touring() && tourStep().info)) {
+    if (e.key === " " || e.key === "Enter" || e.key === "ArrowDown") { e.preventDefault(); coachGo(); }
+    return;
+  }
+  if (touring() && state.tour.step === TOUR.length - 1 && (e.key === " " || e.key === "Enter")) { e.preventDefault(); finishTour(false); return; }
+  const open = !$("#toolbar").hidden && target;
+  if (e.key === "Escape") { if (open && mode === "note") back(); else closeToolbar(); return; }
+  if (open && mode === "note") {
+    if (e.key === "Enter") { e.preventDefault(); saveDraft(); }
+    return;
+  }
+  if (open && /^[1-9]$/.test(e.key) && !e.ctrlKey && !e.metaKey && !e.altKey) {
+    e.preventDefault();
+    const t = cb().tags[+e.key - 1];
+    if (t && fits(t, target)) openNote(t);
+    return;
+  }
+  if (e.key === "?") { showHelp(); return; }
+  if (e.target.closest && e.target.closest("button") && (e.key === " " || e.key === "Enter")) return;
+  if (reading() && (e.key === " " || e.key === "ArrowDown" || e.key === "j")) { e.preventDefault(); next(); }
+});
+// On touch screens a long-press selection ends without mouseup: act once it has rested.
+let resting = 0;
+document.addEventListener("selectionchange", () => {
+  if (!matchMedia("(pointer: coarse)").matches || !reading() || blocked()) return;
+  clearTimeout(resting);
+  resting = setTimeout(() => { const s = getSelection(); if (s.rangeCount && !s.isCollapsed) onSelect(null); }, 650);
+});
+window.addEventListener("resize", () => { if (!$("#toolbar").hidden) place(); placeCallout(); });
+window.addEventListener("beforeunload", e => { if (!DEMO && state.changedAt > state.fileAt) { e.preventDefault(); e.returnValue = ""; } });
+
+function showHelp() {
+  closeToolbar(); renderLegend(); $("#help").hidden = false; placeCallout();
+  $("#help .sheet").scrollTop = 0; $("#help-close").focus({ preventScroll: true });
+}
+function hideHelp() { $("#help").hidden = true; placeCallout(); }
+$("#help-btn").addEventListener("click", showHelp);
+$("#help-close").addEventListener("click", hideHelp);
+$("#help-practice").addEventListener("click", () => { hideHelp(); startTour(); });
+$("#home-practice").addEventListener("click", startTour);
+$("#help").addEventListener("click", e => { if (e.target.id === "help") hideHelp(); });
+$("#home-btn").addEventListener("click", () => state.view === "welcome" ? null : showHome());
+$("#theme-btn").addEventListener("click", () => { state.theme = theme() === "dark" ? "light" : "dark"; persist(); applyDisplay(); placeCallout(); });
+$("#next").addEventListener("click", () => gated() ? ack() : next());
+$("#w-start").addEventListener("click", () => leaveWelcome(true));
+$("#w-skip").addEventListener("click", () => leaveWelcome(false));
+$("#coach-skip").addEventListener("click", () => finishTour(true));
+$("#coach-go").addEventListener("click", coachGo);
+$("#coach-back").addEventListener("click", coachBack);
+$("#codebook").addEventListener("change", e => { state.codebook = e.target.value; persist(); renderHome(); });
+$("#save").addEventListener("click", saveFile);
+$("#load").addEventListener("click", () => $("#file").click());
+$("#w-load").addEventListener("click", () => $("#file").click());
+$("#file").addEventListener("change", e => { if (e.target.files[0]) loadFile(e.target.files[0]); e.target.value = ""; });
+$("#add-batch").addEventListener("click", () => $("#batch-file").click());
+$("#batch-file").addEventListener("change", e => { if (e.target.files[0]) addBatch(e.target.files[0]); e.target.value = ""; });
+
+if (!PACKAGE.codebooks.includes(state.codebook)) state.codebook = PACKAGE.codebook;
+// Active time per session, in 5-second steps: counted while a session is open, the page is in view and the
+// rater did something in the last two minutes. It shows effort and order without a clock time.
+let lastInput = Date.now();
+["pointerdown", "pointermove", "keydown", "wheel", "touchstart"].forEach(t => addEventListener(t, () => { lastInput = Date.now(); }, { passive: true, capture: true }));
+setInterval(() => {
+  if (state.view === "session" && document.visibilityState === "visible" && Date.now() - lastInput < 120000) { const st = sess(); st.active = (st.active || 0) + 5; }
+}, 5000);
+document.body.classList.toggle("demo", DEMO);
+if (MEMORY && !DEMO) $("#help-storage").textContent = "This page does not store your work in the browser: save to a file before you close the page. To continue, open the page and load that file; if you were sent batch files, add them again first (Home, Add a batch).";
+// The edition names the page; without one, the app's own name.
+const EDITION = { name: APP.name, subtitle: APP.subtitle, ...(PACKAGE.edition || {}) };
+document.title = EDITION.name;
+document.querySelectorAll(".brand").forEach(b => b.replaceChildren(el("b", null, EDITION.name), el("span", null, EDITION.subtitle)));
+$("#about").textContent = `${EDITION.name}, version ${APP.version}`;
+loadSessions(); applyDisplay(); renderSaveState();
+if (state.view === "welcome" || !state.experience) showWelcome();
+else if (touring()) { showView("tour"); renderSession(); renderCoach(); }
+else if (state.view === "session" && SESSIONS[state.current]) openSession(state.current);
+else showHome();
+</script>
+</body>
+</html>
