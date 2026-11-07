@@ -1,0 +1,40 @@
+{
+ "format": "dialogue-batch",
+ "schema": 0,
+ "study": "fixture",
+ "rater": "R01",
+ "batch": "B2",
+ "sessions": [
+  {
+   "id": "S02",
+   "lines": [
+    {
+     "turn": 0,
+     "speaker": "therapist",
+     "text": "Good to see you, Bill. How did the seminar go this week?"
+    },
+    {
+     "turn": 1,
+     "speaker": "patient",
+     "text": "I went. My voice shook at the start, but after a minute it settled."
+    },
+    {
+     "turn": 1,
+     "speaker": "therapist",
+     "text": "You went, and you stayed while your voice shook. What did you notice after that first minute?"
+    },
+    {
+     "turn": 2,
+     "speaker": "patient",
+     "text": "That nobody seemed to care as much as I thought. A few people were even nodding."
+    },
+    {
+     "turn": 2,
+     "speaker": "therapist",
+     "text": "That's worth remembering. Shall we write it down, so you can read it before the presentation?"
+    }
+   ]
+  }
+ ],
+ "sha256": "79c24f0bfc02672bd7d1ef4c5b754ade3901d8a6aa155eb6b0cd34a3f5deddc3"
+}

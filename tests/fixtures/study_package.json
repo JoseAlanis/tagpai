@@ -1,0 +1,58 @@
+{
+ "study": "fixture",
+ "rater": "R01",
+ "package_id": "fixture-R01",
+ "codebook": "pbt",
+ "codebooks": [
+  "pbt"
+ ],
+ "practice": "bill",
+ "batches": [
+  {
+   "id": "B1",
+   "sessions": [
+    {
+     "id": "S01",
+     "lines": [
+      {
+       "turn": 0,
+       "speaker": "therapist",
+       "text": "Welcome back, Bill. Last time you tried the first minute of your talk here. How has the week been?"
+      },
+      {
+       "turn": 1,
+       "speaker": "patient",
+       "text": "Mixed. I practised the talk twice at home, and that went fine. But on Thursday I skipped the seminar because I knew I'd have to speak."
+      },
+      {
+       "turn": 1,
+       "speaker": "therapist",
+       "text": "Practising twice is real work. What happened on Thursday morning, before you decided to stay away?"
+      },
+      {
+       "turn": 2,
+       "speaker": "patient",
+       "text": "I woke up with my stomach in knots. I kept picturing everyone staring at me, and I couldn't face it."
+      },
+      {
+       "turn": 2,
+       "speaker": "therapist",
+       "text": "So the picture of everyone staring came first, and then the urge to stay away. How did you feel once you'd decided?"
+      },
+      {
+       "turn": 3,
+       "speaker": "patient",
+       "text": "Relieved for an hour or so. Then I felt like a failure for the rest of the day.",
+       "raw": "Relieved for an hour or so. Then I felt like a failure for the rest of the day. *sighs*"
+      },
+      {
+       "turn": 3,
+       "speaker": "therapist",
+       "text": "Relief first, then a heavy feeling afterwards. Next week, shall we plan the seminar together, one step at a time?"
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}
