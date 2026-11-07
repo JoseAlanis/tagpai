@@ -8,23 +8,45 @@ import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
-async function until(probe, label, timeout = 10000) {
-  const t0 = Date.now();
-  while (Date.now() - t0 < timeout) { const v = await probe(); if (v) return v; await sleep(80); }
+// Every wait on Chrome (starting, a command, a page loading, a file being saved) gives up after a minute:
+// a small or freshly started machine can be slow. A wait ends as soon as what it waits for happens.
+const LIMIT = 60000;
+// Settles as `promise` does, or fails with "timed out: <label>" after `ms`.
+function within(promise, ms, label) {
+  let timer;
+  const late = new Promise((_, no) => { timer = setTimeout(() => no(new Error(`timed out: ${label}`)), ms); });
+  return Promise.race([promise, late]).finally(() => clearTimeout(timer));
+}
+// Asks `probe` (which may return a promise) until its answer is true, for at most `timeout` in all.
+async function until(probe, label, timeout = LIMIT) {
+  const end = Date.now() + timeout;
+  while (Date.now() < end) {
+    const v = await within(Promise.resolve().then(probe), end - Date.now(), label);
+    if (v) return v;
+    await sleep(80);
+  }
   throw new Error(`timed out: ${label}`);
 }
 class Conn {
   constructor(url) {
     this.ws = new WebSocket(url); this.n = 0; this.wait = new Map(); this.events = [];
-    this.opened = new Promise((ok, no) => { this.ws.onopen = ok; this.ws.onerror = no; });
+    this.opened = within(new Promise((ok, no) => { this.ws.onopen = ok; this.ws.onerror = no; }), LIMIT, 'connection to Chrome');
     this.ws.onmessage = m => {
       const d = JSON.parse(m.data);
       if (d.method) { this.events.push(d); return; }
       const w = this.wait.get(d.id); if (!w) return; this.wait.delete(d.id);
       d.error ? w.no(new Error(JSON.stringify(d.error))) : w.ok(d.result);
     };
+    // A closed connection answers nothing more: every command still waiting fails at once.
+    this.ws.onclose = () => { for (const w of this.wait.values()) w.no(new Error('connection to Chrome closed')); this.wait.clear(); };
   }
-  send(method, params = {}) { const id = ++this.n; this.ws.send(JSON.stringify({ id, method, params })); return new Promise((ok, no) => this.wait.set(id, { ok, no })); }
+  send(method, params = {}) {
+    if (this.ws.readyState !== WebSocket.OPEN) return Promise.reject(new Error('connection to Chrome closed'));
+    const id = ++this.n;
+    const reply = new Promise((ok, no) => this.wait.set(id, { ok, no }));
+    this.ws.send(JSON.stringify({ id, method, params }));
+    return within(reply, LIMIT, method).finally(() => this.wait.delete(id));
+  }
   close() { try { this.ws.close(); } catch { /* already closed */ } }
 }
 
@@ -121,8 +143,9 @@ export async function run(htmlPath, shotDir, body) {
       if (chromeGone) throw new Error(`Chrome ${chromeGone}`);
       return existsSync(portFile) && readFileSync(portFile, 'utf8').split('\n')[0];
     }, 'chrome').catch(e => { throw new Error(`${e.message}${chromeSaid.trim() ? `; Chrome said: ${chromeSaid.trim().slice(-1500)}` : ''}`); });
-    const version = await (await fetch(`http://127.0.0.1:${port}/json/version`)).json();
-    const page = (await (await fetch(`http://127.0.0.1:${port}/json/list`)).json()).find(t => t.type === 'page');
+    const ask = path => fetch(`http://127.0.0.1:${port}${path}`, { signal: AbortSignal.timeout(LIMIT) }).then(r => r.json());
+    const version = await ask('/json/version');
+    const page = (await ask('/json/list')).find(t => t.type === 'page');
     const browser = new Conn(version.webSocketDebuggerUrl); conns.push(browser); await browser.opened;
     await browser.send('Browser.setDownloadBehavior', { behavior: 'allow', downloadPath: downloads });
     tab = new Conn(page.webSocketDebuggerUrl); conns.push(tab); await tab.opened;
@@ -137,10 +160,14 @@ export async function run(htmlPath, shotDir, body) {
     process.exitCode = 1;
   } finally {
     conns.forEach(c => c.close());
-    // Remove the temporary profile and downloads after Chrome has exited.
-    const stopped = chromeGone ? Promise.resolve() : new Promise(r => chrome.once('exit', r));
+    // Stop Chrome, by force if it has not exited after 5 seconds, and wait (5 seconds at most) for it to
+    // exit before removing the temporary profile and downloads.
+    const stopped = chromeGone ? Promise.resolve(true) : new Promise(r => chrome.once('exit', () => r(true)));
+    const exited = () => within(stopped, 5000, 'Chrome to exit').catch(() => false);
     chrome.kill();
-    await Promise.race([stopped, sleep(5000)]);
+    if (!await exited()) { chrome.kill('SIGKILL'); await exited(); }
+    // A helper process that still holds Chrome's error output must not keep the run open.
+    chrome.stderr.destroy(); chrome.unref();
     for (const dir of [downloads, profile]) try { rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }); } catch { /* left in the temp folder */ }
   }
 }
