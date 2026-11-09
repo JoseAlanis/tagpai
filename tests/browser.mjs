@@ -135,6 +135,9 @@ export async function run(htmlPath, shotDir, body) {
   // Every request over the whole run, not only at startup: the page itself, data: and blob: only.
   const offsite = () => tab.events.filter(e => e.method === 'Network.requestWillBeSent').map(e => e.params.request.url).filter(u => !/^(file|data|blob):/.test(u));
   const requests = () => tab.events.filter(e => e.method === 'Network.requestWillBeSent').length;
+  // Everything the page's security policy blocked (Chrome reports each as a security error), over the whole run.
+  const blocked = () => tab.events.filter(e => e.method === 'Log.entryAdded' && e.params.entry.source === 'security')
+    .map(e => e.params.entry.text.slice(0, 160));
   const pageErrors = () => tab.events.filter(e => e.method === 'Runtime.exceptionThrown' || (e.method === 'Runtime.consoleAPICalled' && e.params.type === 'error'))
     .map(e => JSON.stringify(e.params).slice(0, 200));
   try {
@@ -149,11 +152,11 @@ export async function run(htmlPath, shotDir, body) {
     const browser = new Conn(version.webSocketDebuggerUrl); conns.push(browser); await browser.opened;
     await browser.send('Browser.setDownloadBehavior', { behavior: 'allow', downloadPath: downloads });
     tab = new Conn(page.webSocketDebuggerUrl); conns.push(tab); await tab.opened;
-    await tab.send('Runtime.enable'); await tab.send('Page.enable'); await tab.send('Network.enable'); await tab.send('DOM.enable');
+    await tab.send('Runtime.enable'); await tab.send('Page.enable'); await tab.send('Network.enable'); await tab.send('DOM.enable'); await tab.send('Log.enable');
     await tab.send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: 'light' }] });
     await open();
     await body({ tab, js, check, shot, key, settle, calm, point, drag, select, click, centre, centreEl, pick, st, upload,
-                 alerts, confirms, open, offsite, requests, pageErrors, until, sleep, downloads, htmlPath });
+                 alerts, confirms, open, offsite, requests, blocked, pageErrors, until, sleep, downloads, htmlPath });
     console.log(JSON.stringify({ ok: true, passed }, null, 1));
   } catch (e) {
     console.log(JSON.stringify({ ok: false, error: String(e), passed }, null, 1));

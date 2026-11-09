@@ -47,6 +47,11 @@ def check(package: dict) -> None:
                 raise SystemExit(f"session {sid}: every line needs turn, speaker (therapist or patient) and text")
 
 
+def sha256(text: str) -> str:
+    """The policy source that allows exactly this text: 'sha256-<base64 of its SHA-256>'."""
+    return "'sha256-" + base64.b64encode(hashlib.sha256(text.encode()).digest()).decode() + "'"
+
+
 def build(package: dict, out: Path) -> str:
     """Write the page and return its text without the fonts (for checks on what the page says)."""
     check(package)
@@ -58,12 +63,13 @@ def build(package: dict, out: Path) -> str:
     for slot, name in FONTS.items():
         assert page.count(slot) == 1, slot
         page = page.replace(slot, base64.b64encode((APP / "fonts" / name).read_bytes()).decode())
-    # The security policy allows exactly this page's one script, by its hash: no other script can run.
-    assert page.count("__SCRIPT_HASH__") == 1
-    assert page.count("<script>") == 1 and page.count("</script>") == 1
-    script = page.split("<script>", 1)[1].split("</script>", 1)[0]
-    allow = "'sha256-" + base64.b64encode(hashlib.sha256(script.encode()).digest()).decode() + "'"
-    page, readable = page.replace("__SCRIPT_HASH__", allow), readable.replace("__SCRIPT_HASH__", allow)
+    # The security policy allows exactly this page's one style block and one script, by their hashes
+    # (taken on the final page, fonts included): no other style block, style attribute or script applies.
+    for slot, tag in (("__STYLE_HASH__", "style"), ("__SCRIPT_HASH__", "script")):
+        assert page.count(slot) == 1, slot
+        assert page.count(f"<{tag}>") == 1 and page.count(f"</{tag}>") == 1, tag
+        allow = sha256(page.split(f"<{tag}>", 1)[1].split(f"</{tag}>", 1)[0])
+        page, readable = page.replace(slot, allow), readable.replace(slot, allow)
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(page)
     return readable

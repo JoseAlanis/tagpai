@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="referrer" content="no-referrer">
 <link rel="icon" href="data:,">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src __SCRIPT_HASH__; img-src data:; font-src data:; connect-src 'none'; form-action 'none'; base-uri 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src __STYLE_HASH__; script-src __SCRIPT_HASH__; img-src data:; font-src data:; connect-src 'none'; form-action 'none'; base-uri 'none'">
 <title>TagpAI</title>
 <style>
 /* Paper and ink. Colour appears where a rater marks something, plus a few small signals in violet. */
@@ -213,6 +213,7 @@ main { padding: 56px 24px 0; }
 .welcome .notice { margin: -14px 0 0; font-size: 15px; color: var(--quiet); }
 .welcome h2, .home h2 { margin: 44px 0 10px; font-size: 18px; font-weight: 700; }
 .small { margin: 0 0 8px; font-size: 15px; color: var(--quiet); }
+.home .spacer { height: 80px; }
 /* A demo copy collects nothing: no saving, no experience questions, no batches. */
 .demo .not-demo { display: none !important; }
 .check { display: flex; gap: 12px; align-items: flex-start; padding: 12px 0; border-bottom: 1px solid var(--rule); font-size: 17px; cursor: pointer; }
@@ -315,7 +316,7 @@ main { padding: 56px 24px 0; }
     <div class="setting not-demo"><span>Continue from a saved file</span><button class="btn" id="load">Load…</button></div>
     <div class="setting" id="codebook-row"><span>Codebook</span><select id="codebook" aria-label="Codebook"></select></div>
     <input id="file" type="file" accept=".json,application/json" hidden>
-    <div style="height: 80px"></div>
+    <div class="spacer"></div>
   </section>
   <div class="reader" id="reader" hidden>
     <div id="dialogue"></div>
