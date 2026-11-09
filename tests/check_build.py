@@ -6,7 +6,8 @@ Every built page has one style block and one script, each allowed by its own has
 no style attributes, and conversation text cannot end the script early or open a style block. The site
 folder holds the project page and one page per edition, nothing else; the project page has no script and
 lists every edition, with its text escaped. Only demos go on the site: a study package, a package not
-marked exactly as a demo, or a demo with conversations of its own is refused. Packages the app would misread are refused: a session or batch name used
+marked exactly as a demo, or a demo with conversations of its own is refused. On a Python older than 3.12
+the build stops and says so. Packages the app would misread are refused: a session or batch name used
 twice, a reserved name, a malformed line.
 """
 import base64
@@ -14,6 +15,7 @@ import copy
 import hashlib
 import json
 import re
+import subprocess
 import sys
 import tempfile
 from pathlib import Path
@@ -150,4 +152,8 @@ SHELL = "<style>__READER_SERIF__ __READER_SANS__</style>"
 check(not finish_refused(f'<meta content="style-src __STYLE_HASH__">{SHELL}'), "a page with one style block and no script is finished")
 check(finish_refused(f'<meta content="style-src __STYLE_HASH__">{SHELL}<script>alert(1)</script>'), "a page with a script but no hash slot for it is refused")
 check(finish_refused(f'<meta content="style-src __STYLE_HASH__">{SHELL}<style>body{{}}</style>'), "a page with two style blocks is refused")
+
+older = subprocess.run([sys.executable, "-B", "-c", "import runpy, sys; sys.version_info = (3, 11, 9, 'final', 0); runpy.run_path(sys.argv[1])",
+                        str(ROOT / "build.py")], capture_output=True, text=True)
+check(older.returncode != 0 and "needs Python 3.12 or later" in older.stderr, "on a Python older than 3.12 the build stops and says so")
 print(json.dumps({"ok": True, "passed": passed}, indent=1))

@@ -32,9 +32,10 @@ jobs:
           node-version: 22
           package-manager-cache: false
 
+      # Python 3.12 is the documented minimum, so the checks run on 3.12 (any patch release).
       - name: Versions
         run: |
-          python3 --version
+          python3 -c 'import sys; print("Python", sys.version.split()[0]); assert sys.version_info[:2] == (3, 12), "expected Python 3.12.x, the documented minimum"'
           node --version
           google-chrome --version
 

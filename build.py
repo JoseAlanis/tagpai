@@ -18,6 +18,9 @@ import shutil
 import sys
 from pathlib import Path
 
+if sys.version_info < (3, 12):
+    sys.exit(f"build.py needs Python 3.12 or later (this is {sys.version.split()[0]})")
+
 HERE = Path(__file__).resolve().parent
 APP = HERE / "app"
 SITE = HERE / "site"
