@@ -15,7 +15,7 @@ python3 build.py <package.json> <out.html>  # any package
 `dist/site/` holds exactly what is published: the project page and one
 folder per edition. Only demos go there (`"demo": true`, no conversations of
 their own); any other package is built on its own with the second command,
-for use offline. The build needs Python 3.9 or later and nothing else.
+for use offline. The build needs Python 3.12 or later and nothing else.
 
 ## Test
 

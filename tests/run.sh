@@ -1,6 +1,6 @@
 #!/bin/sh
 # Check the builder, build the site and a study copy from the test fixtures, then run the browser checks.
-#   sh tests/run.sh       (from the repository root; needs Python 3.9 or later, Node 22 or later, Google Chrome)
+#   sh tests/run.sh       (from the repository root; needs Python 3.12 or later, Node 22 or later, Google Chrome)
 set -eu
 cd "$(dirname "$0")/.."
 python3 -B tests/check_build.py
