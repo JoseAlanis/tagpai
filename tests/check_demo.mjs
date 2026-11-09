@@ -2,7 +2,7 @@
 // session, step by step, and what a demo
 // keeps (nothing). Then phone width, network, the security policy and framing; last, the page served over
 // HTTP, as on GitHub Pages.
-//   node tests/check_demo.mjs dist/clinical-dialogue/index.html dist/shots/demo
+//   node tests/check_demo.mjs dist/site/clinical-dialogue/index.html dist/shots/demo
 import { readdirSync, readFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { run } from './browser.mjs';

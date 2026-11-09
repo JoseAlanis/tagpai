@@ -51,7 +51,8 @@ class Conn {
 }
 
 // Run `body` against the page at `htmlPath`; print the checks that passed as JSON, and fail on the first that does not.
-export async function run(htmlPath, shotDir, body) {
+// `app: false` for a page without the app (such as the project page): opening it waits for its load event only.
+export async function run(htmlPath, shotDir, body, { app = true } = {}) {
   mkdirSync(shotDir, { recursive: true });
   const downloads = mkdtempSync(join(tmpdir(), 'tagpai-dl-'));
   const profile = mkdtempSync(join(tmpdir(), 'tagpai-chrome-'));
@@ -129,7 +130,7 @@ export async function run(htmlPath, shotDir, body) {
     const from = tab.events.length;
     await tab.send('Page.navigate', { url });
     await until(() => tab.events.slice(from).some(e => e.method === 'Page.loadEventFired'), 'load');
-    await until(() => js(`typeof state !== 'undefined' && ${ready}`), 'app');
+    if (app) await until(() => js(`typeof state !== 'undefined' && ${ready}`), 'app');
     await catchAlerts();
   };
   // Every request over the whole run, not only at startup: the page itself, data: and blob: only.

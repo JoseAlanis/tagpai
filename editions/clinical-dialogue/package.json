@@ -1,7 +1,8 @@
 {
  "edition": {
   "name": "TagpAI Clinical Dialogue",
-  "subtitle": "A human annotation tool for AI research"
+  "subtitle": "A human annotation tool for AI research",
+  "about": "Annotate symptoms, change processes and therapist strategies in conversations between a therapist and a patient. A guided practice on a made-up session shows how."
  },
  "study": "demo",
  "rater": "DEMO",
