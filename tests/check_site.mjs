@@ -17,6 +17,7 @@ await run(join(siteDir, 'index.html'), shotDir, async ({ tab, js, check, shot, c
   check(await js(`[...document.querySelectorAll('.edition')].every(e => e.querySelector('h3').textContent.trim() && e.querySelector('p').textContent.trim())`), 'each edition has a name and a description');
   check(await js(`document.body.textContent.includes('Not yet for studies') && /version \\d+\\.\\d+\\.\\d+/.test(document.querySelector('footer').textContent)`), 'the status and the version are stated');
   check(await js(`(() => { const p = [...document.querySelectorAll('h2')].find(h => h.textContent === 'Privacy').nextElementSibling; return p.textContent.includes('GitHub logs the visitor') && p.querySelector('a').href.startsWith('https://docs.github.com/'); })()`), 'the privacy note says GitHub logs IP addresses, with a link to its documentation');
+  check(await js(`[...[...document.querySelectorAll('h2')].find(h => h.textContent === 'Privacy').nextElementSibling.querySelectorAll('a')].some(a => a.href === 'https://github.com/JoseAlanis/tagpai/blob/main/PRIVACY.md')`), 'the privacy note links the privacy notice');
   check(await js(`document.querySelector('footer a').href === 'https://github.com/JoseAlanis/tagpai'`), 'the footer links the source code');
   check(await js(`document.fonts.check('17px "Reader Sans"') && getComputedStyle(document.body).fontFamily.startsWith('"Reader Sans"')`), 'the embedded font is used');
   await shot('1-light');

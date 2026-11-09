@@ -23,11 +23,17 @@ conversations. A guided practice on a made-up session gets you started.
 ## Status
 
 Early demo phase (v0.0.x): the code and a public demo with made-up
-content. Not yet for studies.
+content. Not yet for studies. Changes between versions are listed in
+[CHANGELOG.md](CHANGELOG.md).
 
 ## Development
 
 To build the pages or run the tests, see [DEVELOPMENT.md](DEVELOPMENT.md).
+
+## Privacy and security
+
+The pages collect nothing about you; see [PRIVACY.md](PRIVACY.md). To
+report a security problem, see [SECURITY.md](SECURITY.md).
 
 ## License
 
