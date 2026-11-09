@@ -8,7 +8,7 @@ import { createServer } from 'node:http';
 import { run } from './browser.mjs';
 
 const [htmlPath, shotDir] = process.argv.slice(2);
-await run(htmlPath, shotDir, async ({ tab, js, check, shot, key, calm, select, click, centre, pick, st, open, offsite, requests, pageErrors, until, sleep, downloads }) => {
+await run(htmlPath, shotDir, async ({ tab, js, check, shot, key, calm, select, click, centre, pick, st, open, offsite, requests, blocked, pageErrors, until, sleep, downloads }) => {
   const step = () => js(`state.tour.step`);
   const veiled = () => js(`!document.getElementById('dim').hidden && document.getElementById('coach').classList.contains('lifted')`);
   const lifted = () => js(`[...document.querySelectorAll('.line.lifted')].map(a => a.dataset.i).join()`);
@@ -112,6 +112,7 @@ await run(htmlPath, shotDir, async ({ tab, js, check, shot, key, calm, select, c
   check(await step() === 23 && await goText() === 'Finish' && await js(`document.getElementById('wrap').classList.contains('lifted')`), 'the last panel lights up the marks and questions');
   check(s.marks.length === 8 && ['clinical', 'process', 'strategy', 'form'].every(t => s.marks.some(m => m.tag === t)), 'eight marks in four colours');
   check(s.marks.every(m => Array.from(m.version === 'raw' ? lines[m.line].raw : lines[m.line].text).slice(m.start, m.end).join('') === m.quote), 'every quote is the exact text at its offsets');
+  check(await js(`(() => { const hl = [...document.querySelectorAll('#dialogue .hl')]; return hl.length > 0 && hl.every(s => s.style.getPropertyValue('--rgb') !== '' && getComputedStyle(s).getPropertyValue('--rgb').trim() === s.style.getPropertyValue('--rgb').trim() && getComputedStyle(s).backgroundImage.includes('rgba')); })()`), "the marks' colours, set by the page's script, apply");
   check(await js(`document.getElementById('wrap').textContent.includes('Which process would you target first?')`), 'the questions are the process-based ones');
   await calm(); await shot('6-end');
   await click(await centre('#coach-go'));
@@ -143,7 +144,14 @@ await run(htmlPath, shotDir, async ({ tab, js, check, shot, key, calm, select, c
   check(await js(`document.documentElement.scrollWidth <= 390`), 'no horizontal scroll in the practice at phone width');
 
   check(requests() > 0 && offsite().length === 0, 'no request leaves the device over the whole run', offsite().slice(0, 3).join(' '));
+  check(blocked().length === 0, "the page's own styles and script break no rule of its security policy", blocked().join(' | '));
   check(await js(`(() => { const m = document.querySelector('meta[http-equiv="Content-Security-Policy"]').content; window.__ran = 0; const s = document.createElement('script'); s.textContent = 'window.__ran = 1'; document.body.append(s); return /script-src 'sha256-[^']+'/.test(m) && !/script-src[^;]*unsafe-inline/.test(m) && m.includes("base-uri 'none'") && m.includes("connect-src 'none'") && window.__ran === 0; })()`), "only the page's own script may run: an injected one is blocked");
+  check(await js(`/style-src 'sha256-[^']+';/.test(document.querySelector('meta[http-equiv="Content-Security-Policy"]').content) && (() => {
+    const s = document.createElement('style'); s.textContent = 'body { display: none !important; }'; document.head.append(s);
+    const d = document.createElement('div'); d.setAttribute('style', 'width: 123px'); document.body.append(d);
+    const ok = getComputedStyle(document.body).display !== 'none' && getComputedStyle(d).width !== '123px';
+    s.remove(); d.remove(); return ok; })()`), "only the page's own styles apply: an injected style block and style attribute are ignored");
+  check(blocked().length === 3, 'the policy reports what was blocked: the script, the style block, the style attribute', blocked().join(' | '));
   check(pageErrors().length === 0, 'no page errors', pageErrors().join(' | '));
   const page = readFileSync(htmlPath, 'utf8');
   await js(`(() => { const f = document.createElement('iframe'); f.id = 'framed'; f.srcdoc = ${JSON.stringify(page)}; document.body.append(f); return true; })()`);
@@ -158,7 +166,7 @@ await run(htmlPath, shotDir, async ({ tab, js, check, shot, key, calm, select, c
   const served = `http://127.0.0.1:${server.address().port}/tagpai/clinical-dialogue/`;
   try {
     await tab.send('Emulation.clearDeviceMetricsOverride');
-    const from = tab.events.length;
+    const from = tab.events.length, before = blocked().length;
     await tab.send('Page.navigate', { url: served });
     await until(() => tab.events.slice(from).some(e => e.method === 'Page.loadEventFired'), 'served load');
     await until(() => js(`typeof state !== 'undefined' && !document.getElementById('welcome').hidden`), 'served app');
@@ -167,6 +175,12 @@ await run(htmlPath, shotDir, async ({ tab, js, check, shot, key, calm, select, c
     await click(await centre('#w-start')); await key(' '); await key(' ');
     check(await js(`state.view === 'tour' && state.tour.step === 2`), 'served: the practice runs');
     check(await js(`(() => { window.__ran = 0; const s = document.createElement('script'); s.textContent = 'window.__ran = 1'; document.body.append(s); return window.__ran === 0; })()`), 'served: an injected script is blocked');
+    check(blocked().length === before + 1, 'served: the page breaks no rule of its policy (only the injected script was blocked)', blocked().slice(before).join(' | '));
+    check(await js(`(() => {
+    const s = document.createElement('style'); s.textContent = 'body { display: none !important; }'; document.head.append(s);
+    const d = document.createElement('div'); d.setAttribute('style', 'width: 123px'); document.body.append(d);
+    const ok = getComputedStyle(document.body).display !== 'none' && getComputedStyle(d).width !== '123px';
+    s.remove(); d.remove(); return ok; })()`), 'served: an injected style block and style attribute are ignored');
     const asked = tab.events.slice(from).filter(e => e.method === 'Network.requestWillBeSent').map(e => e.params.request.url).filter(u => !/^(data|blob):/.test(u));
     check(asked.length === 1 && asked[0] === served, 'served: the only request is the page itself', asked.join(' '));
     check(await js(`localStorage.length === 0 && sessionStorage.length === 0`), 'served: nothing stored');

@@ -2,8 +2,8 @@
 
     python3 tests/check_build.py
 
-Every built page has one script, allowed by its own hash in the security policy, and conversation text
-cannot end that script early. Packages the app would misread are refused: a session or batch name used
+Every built page has one style block and one script, each allowed by its own hash in the security policy,
+no style attributes, and conversation text cannot end the script early or open a style block. Packages the app would misread are refused: a session or batch name used
 twice, a reserved name, a malformed line.
 """
 import base64
@@ -46,7 +46,8 @@ def variant(change) -> dict:
 
 
 with tempfile.TemporaryDirectory() as tmp:
-    hostile = variant(lambda d: d["batches"][0]["sessions"][0]["lines"][1].update(text="</script><script>alert(1)</script> <!-- x"))
+    hostile = variant(lambda d: d["batches"][0]["sessions"][0]["lines"][1].update(
+        text="</script><script>alert(1)</script> <!-- x </style><style>body{display:none}</style>"))
     out = Path(tmp) / "page.html"
     build.build(hostile, out)
     page = out.read_text()
@@ -55,6 +56,11 @@ with tempfile.TemporaryDirectory() as tmp:
     check(page.count("<script>") == 1 and page.count("</script>") == 1 and "alert(1)" in script, "text with </script> stays inside the one script")
     check(allowed == "'sha256-" + base64.b64encode(hashlib.sha256(script.encode()).digest()).decode() + "'", "the policy allows exactly that script, by its hash")
     check("unsafe-inline" not in page.split("script-src", 1)[1].split(";", 1)[0], "no inline scripts allowed otherwise")
+    style = page.split("<style>", 1)[1].split("</style>", 1)[0]
+    style_src = page.split("style-src", 1)[1].split(";", 1)[0].split()
+    check(page.count("<style>") == 1 and page.count("</style>") == 1 and "display:none" in script, "text with </style> stays inside the one script")
+    check(style_src == [build.sha256(style)] and "font/woff2;base64," in style, "the policy allows exactly the one style block, fonts included, by its hash")
+    check(not re.search(r"\sstyle\s*=", page), "no style attributes in the page")
     for edition in sorted((ROOT / "editions").glob("*/package.json")):
         build.build(json.loads(edition.read_text()), Path(tmp) / f"{edition.parent.name}.html")
     check(True, "every edition builds")

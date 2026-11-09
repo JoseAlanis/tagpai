@@ -11,7 +11,7 @@ const [htmlPath, shotDir] = process.argv.slice(2);
 const fixture = name => fileURLToPath(new URL(`./fixtures/${name}`, import.meta.url));
 const DAY = 86400000;
 const dateIn = k => { const d = new Date(Date.now() + k * DAY), z = n => String(n).padStart(2, '0'); return `${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())}`; };
-await run(htmlPath, shotDir, async ({ tab, js, check, shot, key, calm, select, click, centre, centreEl, pick, st, upload, alerts, confirms, open, offsite, requests, pageErrors, until, sleep, downloads }) => {
+await run(htmlPath, shotDir, async ({ tab, js, check, shot, key, calm, select, click, centre, centreEl, pick, st, upload, alerts, confirms, open, offsite, requests, blocked, pageErrors, until, sleep, downloads }) => {
   // From the next opening on, the page's clock runs `k` days off, so each day has its own date.
   let shifted = null;
   const setDay = async k => {
@@ -212,4 +212,5 @@ await run(htmlPath, shotDir, async ({ tab, js, check, shot, key, calm, select, c
   check(requests() > 0 && offsite().length === 0, 'no request leaves the device over three days', offsite().slice(0, 3).join(' '));
   check(await js(`localStorage.length === 0 && sessionStorage.length === 0`), 'nothing written to browser storage over three days');
   check(pageErrors().length === 0, 'no page errors', pageErrors().join(' | '));
+  check(blocked().length === 0, 'the page broke no rule of its security policy over three days', blocked().join(' | '));
 });
