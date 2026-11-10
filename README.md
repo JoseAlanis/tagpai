@@ -13,6 +13,9 @@ It runs as a single offline web page: no login, no server behind it, and
 the app makes no network requests of its own, so you can work with your
 data locally on your computer.
 
+Try it: the [Clinical Dialogue demo](https://josealanis.github.io/tagpai/clinical-dialogue/)
+runs in your browser and keeps nothing.
+
 ## Editions
 
 Editions configure the same app for a domain. The current one, TagpAI for

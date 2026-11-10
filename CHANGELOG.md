@@ -2,7 +2,7 @@
 
 Versions 0.0.x are demos; 0.1.0 will be the first version for studies.
 
-## 0.0.1 (unreleased)
+## 0.0.1 (2026-11-10)
 
 The first public version: a demo, not yet for studies.
 
@@ -17,4 +17,9 @@ The first public version: a demo, not yet for studies.
 - **Security.** The page's script and styles are allowed only by their
   hashes; no connections to any server; the app refuses to run inside
   another page; files are checked whole before they are loaded.
+- **Privacy notice and security policy**: the pages collect nothing;
+  security problems are reported privately through GitHub.
+- **Releases** come from signed tags on `main`, after all the tests pass on
+  that commit. The same pages are published on GitHub Pages and as
+  downloads, with their checksums in `SHA256SUMS`.
 - **Tests** in headless Chrome, run on every pull request.
