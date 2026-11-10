@@ -1,0 +1,131 @@
+# Publishes a release when a version tag (v1.2.3) is pushed. The build job checks the tag, runs every test on
+# the tagged commit and prepares the files; it can only read. After approval, the release job publishes the
+# built pages as downloads with their checksums, and then the Pages job publishes the same pages as the
+# site. Only the release job may create the release, and only the Pages job may write to GitHub Pages.
+# The prepared files are kept for seven days, so both approvals must come within seven days of the tag; they
+# are workflow artifacts, which anyone signed in to GitHub can download, and hold only the public pages.
+name: release
+
+on:
+  push:
+    tags: ['v[0-9]+.[0-9]+.[0-9]+']
+
+permissions: {}
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: The tagged commit is on main
+        run: git merge-base --is-ancestor "$GITHUB_SHA" origin/main
+
+      - name: The tag is signed, and GitHub verifies the signature
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          ref=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$GITHUB_REF_NAME" --jq '.object.type + " " + .object.sha')
+          if [ "${ref%% *}" != tag ]; then echo "::error::$GITHUB_REF_NAME is not an annotated, signed tag"; exit 1; fi
+          verified=$(gh api "repos/$GITHUB_REPOSITORY/git/tags/${ref#* }" --jq '.verification.verified')
+          if [ "$verified" != true ]; then echo "::error::GitHub does not verify the signature of $GITHUB_REF_NAME"; exit 1; fi
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1  # v7.1.0
+        with:
+          node-version: 22
+          package-manager-cache: false
+
+      - name: Versions
+        run: |
+          python3 -c 'import sys; print("Python", sys.version.split()[0]); assert sys.version_info[:2] == (3, 12), "expected Python 3.12.x, the documented minimum"'
+          node --version
+          google-chrome --version
+
+      - name: Build and check
+        run: sh tests/run.sh
+
+      - name: Prepare the release files from the checked build
+        run: python3 -B release.py "$GITHUB_REF_NAME"
+
+      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9  # v5.0.0
+        with:
+          path: dist/site/
+          retention-days: 7
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
+        with:
+          name: release
+          path: |
+            dist/release/
+            dist/release-notes.md
+          if-no-files-found: error
+          retention-days: 7
+
+  release:
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    environment: release
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      TAG: ${{ github.ref_name }}
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333  # v8.0.2
+        with:
+          name: release
+          path: release-files
+
+      - name: The files match their checksums
+        working-directory: release-files/release
+        run: sha256sum --check --strict SHA256SUMS
+
+      # A draft is not public. The files are attached to it, and only then is it published, after which a
+      # release cannot change. A draft left by an earlier attempt is replaced. If the release is already
+      # published (a re-run), the build is the same files only if SHA256SUMS matches: then the Pages job
+      # goes ahead with them; otherwise the run stops.
+      - name: Create the release as a draft, attach the files, publish it
+        run: |
+          if gh release view "$TAG" > /dev/null 2>&1; then
+            is_draft=$(gh release view "$TAG" --json isDraft --jq .isDraft) || { echo "::error::could not read the state of $TAG"; exit 1; }
+            case "$is_draft" in true|false) ;; *) echo "::error::unexpected state of $TAG: $is_draft"; exit 1 ;; esac
+            if [ "$is_draft" = true ]; then
+              gh release delete "$TAG" --yes
+            else
+              gh release download "$TAG" --pattern SHA256SUMS --output published-SHA256SUMS || { echo "::error::could not download SHA256SUMS of $TAG"; exit 1; }
+              if cmp -s published-SHA256SUMS release-files/release/SHA256SUMS; then
+                echo "::notice::$TAG is already published with these same files"
+                exit 0
+              fi
+              echo "::error::$TAG is already published, with other files"
+              exit 1
+            fi
+          fi
+          gh release create "$TAG" --draft --verify-tag --title "TagpAI $TAG" --notes-file release-files/release-notes.md release-files/release/*
+          gh release edit "$TAG" --draft=false
+
+  pages:
+    needs: release
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    permissions:
+      pages: write
+      id-token: write
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346  # v5.0.1
