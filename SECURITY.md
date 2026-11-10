@@ -39,5 +39,9 @@ services go to [GitHub's bug bounty programme](https://bounty.github.com/).
   markup. A file loaded into the app is checked whole before anything on
   the page changes.
 - Only demos are published on the site; they keep nothing.
-- The tests run on every pull request with read-only access. The workflow's
+- The tests run on every pull request with read-only access. The workflows'
   actions are pinned to full commit ids, and Dependabot proposes updates.
+- A release is built from a signed tag on `main`, after all the tests pass
+  on that commit. The site and the release downloads are the same files,
+  listed with their checksums in `SHA256SUMS`, and each is published only
+  after the maintainer approves it.
